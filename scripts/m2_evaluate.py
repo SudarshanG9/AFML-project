@@ -25,7 +25,7 @@ from avfuse.member2_data.evaluate import evaluate_config, threshold_at_fpr
 from avfuse.member2_data.manifest import read_manifest
 from avfuse.member2_data.predictions import ContractError, by_config, join, read_predictions
 from avfuse.member2_data.seal import SealedTestError, accesses, open_test
-from avfuse.member2_data.report import config_markdown, paired_markdown, save_json, sha256_file
+from avfuse.member2_data.report import config_markdown, paired_markdown, plot_curves, plot_recall_by_type, save_json, sha256_file
 from avfuse.member2_data.splits import group_clusters
 from avfuse.shared.contracts import PRECISION_MODES
 
@@ -62,10 +62,11 @@ def cmd_evaluate(a, manifest, preds):
         sys.exit("predictions come from a different checkpoint than the frozen protocol")
     clusters = group_clusters(manifest)
     thr = proto["threshold"] if proto else None
-    results, md = {}, []
+    results, md, curves = {}, [], {}
     for cfg, rows in sorted(by_config(preds).items(), key=lambda kv: PRECISION_MODES.index(kv[0])):
         joined = join(manifest, rows, a.split)
         results[cfg] = evaluate_config(joined, clusters, thr, a.n_boot, a.seed)
+        curves[cfg] = ([r["label"] for r in joined], [r["score_fake"] for r in joined])
         md.append(config_markdown(cfg, a.split, results[cfg]))
         m = results[cfg]
         rec = f"  recall {m['recall']['value']:.4f}" if "recall" in m else ""
@@ -87,7 +88,9 @@ def cmd_evaluate(a, manifest, preds):
                "test_accesses_so_far": len(accesses(a.protocol)) if a.protocol else 0, "n_boot": a.n_boot, "seed": a.seed,
                "manifest_sha256": sha256_file(a.manifest), "configs": results}, out / "metrics.json")
     (out / "summary.md").write_text(f"# Forensic evaluation ({a.split})\n\n" + "\n".join(md))
-    print(f"wrote {out}/metrics.json and summary.md")
+    plot_curves(curves, out / "curves.png")
+    plot_recall_by_type(results, out / "recall_by_type.png")
+    print(f"wrote {out}/metrics.json, summary.md and figures")
 
 
 def main():
