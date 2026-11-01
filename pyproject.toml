@@ -16,6 +16,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "ruff>=0.5"]
+# Optional: exact physical-core count and RAM in scripts/check_environment.py.
+# The checker works without it (documented fallbacks).
+diagnostics = ["psutil>=5.9"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

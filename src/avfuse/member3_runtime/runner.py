@@ -1,9 +1,12 @@
 """Stable interface wiring Member 2 features to Member 1 model."""
 from collections.abc import Mapping
+
 import torch
 from torch import Tensor
-from avfuse.shared.contracts import PRECISION_MODES
+
 from avfuse.member1_fusion.model_adapter import ModelAdapter
+from avfuse.shared.contracts import PRECISION_MODES
+
 
 @torch.inference_mode()
 def run_four_modes(model: ModelAdapter, features: Mapping[str, Tensor]) -> dict[str, Tensor]:
