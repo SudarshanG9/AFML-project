@@ -1,0 +1,24 @@
+{
+  "run_id": "UNSET_REAL_RUN_ID",
+  "checkpoint_path": "UNSET",
+  "dataset_manifest_path": "UNSET",
+  "cache_boundary": "frozen_encoder_output_tokens",
+  "backend": "sdpa",
+  "precision_modes": [
+    "reference",
+    "low_precision",
+    "restore_value_output",
+    "restore_query"
+  ],
+  "quantization": {
+    "kind": "simulated_symmetric_int8",
+    "granularity": "per_tensor",
+    "qkv_quantized": true,
+    "fusion_output_quantized": true
+  },
+  "evaluation": {
+    "validation_threshold_policy": "freeze_before_test",
+    "source_disjoint": true,
+    "strata": ["audio_fake", "video_fake", "both_fake"]
+  }
+}

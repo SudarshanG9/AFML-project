@@ -1,0 +1,10 @@
+{
+  "device": "UNSET_REAL_DEVICE",
+  "warmup": 10,
+  "repeats": 50,
+  "batch_size": 1,
+  "operator_shapes_source": "observed_tensor_shapes",
+  "measure_scopes": ["operator", "cached_feature_model"],
+  "preprocessing_scope": "record_once_separately",
+  "peak_memory": "cuda_allocator_peak_if_available_else_null"
+}

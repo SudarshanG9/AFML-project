@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Measured runtime benchmark",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "config",
+    "device",
+    "backend",
+    "scope",
+    "batch_size",
+    "repeats",
+    "p50_ms",
+    "p95_ms",
+    "peak_memory_bytes"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "config": {
+      "enum": [
+        "reference",
+        "low_precision",
+        "restore_value_output",
+        "restore_query"
+      ]
+    },
+    "device": {
+      "type": "string"
+    },
+    "backend": {
+      "type": "string"
+    },
+    "scope": {
+      "enum": [
+        "operator",
+        "cached_feature_model",
+        "preprocessing_once"
+      ]
+    },
+    "batch_size": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repeats": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "p50_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "p95_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "peak_memory_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "conversion_overhead_ms": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
