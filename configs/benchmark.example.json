@@ -1,10 +1,62 @@
 {
-  "device": "UNSET_REAL_DEVICE",
+  "config_version": "0.1",
+  "experiment_id": "UNSET_EXPERIMENT_ID",
+
+  "device": "cpu",
+  "on_device_unavailable": "error",
+  "backends": ["sdpa"],
+  "configs": ["reference", "low_precision", "restore_value_output", "restore_query"],
+
+  "batch_size": 1,
   "warmup": 10,
   "repeats": 50,
-  "batch_size": 1,
-  "operator_shapes_source": "observed_tensor_shapes",
+
   "measure_scopes": ["operator", "cached_feature_model"],
   "preprocessing_scope": "record_once_separately",
-  "peak_memory": "cuda_allocator_peak_if_available_else_null"
+
+  "operator_shapes_source": "observed_tensor_shapes",
+  "operator_shapes_file": null,
+
+  "input_boundary": {
+    "operator": "synthetic_tensors",
+    "cached_feature_model": "cached_encoder_tokens",
+    "preprocessing_once": "raw_media",
+    "disclosure": "cached_feature_model latency = cached-feature fusion + head only; it excludes raw-media decode and frozen-encoder feature extraction, which are timed separately under preprocessing_once."
+  },
+  "checkpoint_path": null,
+  "cache_manifest_path": null,
+
+  "synchronization": {
+    "enabled": true,
+    "after_warmup": true,
+    "around_each_repeat": true
+  },
+
+  "peak_memory": "cuda_allocator_peak_if_available_else_null",
+  "peak_memory_reset_before_measurement": true,
+
+  "percentile_method": "linear",
+
+  "conversion_overhead": {
+    "measure": true,
+    "included_in_latency": false
+  },
+
+  "output": {
+    "directory": "artifacts/benchmarks",
+    "format": "jsonl",
+    "timing_samples_storage": "inline",
+    "overwrite": false
+  },
+
+  "reproducibility": {
+    "seed": 0,
+    "torch_num_threads": null,
+    "record_git_commit": true,
+    "record_environment_report": true,
+    "environment_report_path": "artifacts/runs/environment_report.json",
+    "hash_checkpoint": true,
+    "hash_input_cache": true,
+    "snapshot_config": true
+  }
 }

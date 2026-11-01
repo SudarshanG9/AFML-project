@@ -1,0 +1,89 @@
+# ---------------------------------------------------------------------------
+# AVFuse-CausalQ .gitignore
+# Policy: code, schemas, example configs, tests and docs are tracked.
+# Data, media, weights, caches and generated results are NOT.
+# ---------------------------------------------------------------------------
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Virtual environments ---
+.venv/
+venv/
+
+# --- Local environment / secrets (keep committed examples) ---
+.env
+.env.*
+!.env.example
+
+# --- Editors, temporary files and OS metadata ---
+.idea/
+.vscode/
+*.swp
+*.tmp
+*.bak
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Licensed media and raw datasets ---
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.wav
+*.flac
+*.mp3
+*.m4a
+*.aac
+*.ogg
+
+# --- Cached feature tensors and model checkpoints / weights ---
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.npy
+*.npz
+
+# --- Machine-specific configuration overrides ---
+configs/*.local.json
+
+# --- Experiment trackers ---
+wandb/
+mlruns/
+
+# --- Data, checkpoints, generated artifacts ---
+# Pattern: ignore the contents, but keep top-level README.md and any README.md
+# placed directly inside a sub-directory (placeholder files).
+/data/*
+!/data/README.md
+!/data/*/
+/data/*/*
+!/data/*/README.md
+
+/checkpoints/*
+!/checkpoints/README.md
+!/checkpoints/*/
+/checkpoints/*/*
+!/checkpoints/*/README.md
+
+/artifacts/*
+!/artifacts/README.md
+!/artifacts/*/
+/artifacts/*/*
+!/artifacts/*/README.md
