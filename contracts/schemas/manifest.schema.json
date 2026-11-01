@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Per-clip manifest entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "clip_id",
+    "dataset",
+    "source_id",
+    "identity_id",
+    "split",
+    "label",
+    "manipulation_type",
+    "feature_path"
+  ],
+  "properties": {
+    "clip_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "train",
+        "val",
+        "test"
+      ]
+    },
+    "label": {
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "manipulation_type": {
+      "enum": [
+        "real",
+        "audio_fake",
+        "video_fake",
+        "both_fake"
+      ]
+    },
+    "feature_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "duration_s": {
+      "type": "number",
+      "minimum": 0
+    },
+    "media_sha256": {
+      "type": "string"
+    },
+    "speaker_id": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "manipulation_type": {
+            "const": "real"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "label": {
+            "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "manipulation_type": {
+            "enum": [
+              "audio_fake",
+              "video_fake",
+              "both_fake"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "label": {
+            "const": 1
+          }
+        }
+      }
+    }
+  ]
+}

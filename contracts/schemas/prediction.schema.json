@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Per-model-configuration prediction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "clip_id",
+    "split",
+    "config",
+    "score_fake",
+    "checkpoint_sha256"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "clip_id": {
+      "type": "string"
+    },
+    "split": {
+      "enum": [
+        "val",
+        "test"
+      ]
+    },
+    "config": {
+      "enum": [
+        "reference",
+        "low_precision",
+        "restore_value_output",
+        "restore_query"
+      ]
+    },
+    "score_fake": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "checkpoint_sha256": {
+      "type": "string"
+    },
+    "predicted_label": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}
