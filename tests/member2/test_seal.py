@@ -29,6 +29,8 @@ def test_test_split_is_sealed_and_logged(tmp_path):
     r = _run(*common, "--protocol", str(proto), "--unseal-test", "--purpose", "unit test", "--out", str(tmp_path / "t"))
     assert r.returncode == 0, r.stderr
     assert [x["purpose"] for x in accesses(proto)] == ["unit test"]
+    summary = (tmp_path / "t" / "summary.md").read_text()
+    assert "Paired: `low_precision` − `reference`" in summary  # Day 10 contrasts included
 
 
 def test_changed_manifest_refused(tmp_path):

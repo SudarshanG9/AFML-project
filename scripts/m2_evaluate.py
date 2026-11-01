@@ -20,11 +20,12 @@ from pathlib import Path
 
 import numpy as np
 
+from avfuse.member2_data.paired import compare
 from avfuse.member2_data.evaluate import evaluate_config, threshold_at_fpr
 from avfuse.member2_data.manifest import read_manifest
 from avfuse.member2_data.predictions import ContractError, by_config, join, read_predictions
 from avfuse.member2_data.seal import SealedTestError, accesses, open_test
-from avfuse.member2_data.report import config_markdown, save_json, sha256_file
+from avfuse.member2_data.report import config_markdown, paired_markdown, save_json, sha256_file
 from avfuse.member2_data.splits import group_clusters
 from avfuse.shared.contracts import PRECISION_MODES
 
@@ -70,8 +71,19 @@ def cmd_evaluate(a, manifest, preds):
         rec = f"  recall {m['recall']['value']:.4f}" if "recall" in m else ""
         print(f"{cfg:22s} AUROC {m['auroc']['value']:.4f} [{m['auroc']['ci_low']:.4f}, {m['auroc']['ci_high']:.4f}]"
               f"  AUPRC {m['auprc']['value']:.4f}{rec}")
+    # Paired contrasts on the same clips (Day 10): the damage, and what each restoration recovers.
+    have = set(results)
+    pairs = [(x, y) for x, y in (("reference", "low_precision"), ("low_precision", "restore_value_output"),
+                                 ("low_precision", "restore_query"), ("restore_query", "restore_value_output"))
+             if x in have and y in have]
+    paired = [compare(manifest, preds, x, y, clusters, a.split, thr, a.n_boot, a.seed) for x, y in pairs]
+    for c in paired:
+        for k, d in c["metrics"].items():
+            print(f"  {c['b']} - {c['a']}  {k:6s} {d['delta']:+.4f} [{d['ci_low']:+.4f}, {d['ci_high']:+.4f}]"
+                  f"{'  *' if d['excludes_zero'] else ''}")
+        md.append(paired_markdown(c))
     out = Path(a.out)
-    save_json({"split": a.split, "threshold": thr,
+    save_json({"split": a.split, "paired": paired, "threshold": thr,
                "test_accesses_so_far": len(accesses(a.protocol)) if a.protocol else 0, "n_boot": a.n_boot, "seed": a.seed,
                "manifest_sha256": sha256_file(a.manifest), "configs": results}, out / "metrics.json")
     (out / "summary.md").write_text(f"# Forensic evaluation ({a.split})\n\n" + "\n".join(md))

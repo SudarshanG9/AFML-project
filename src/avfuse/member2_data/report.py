@@ -39,3 +39,12 @@ def config_markdown(config: str, split: str, m: dict) -> str:
     for ft, b in m["per_type"].items():
         lines.append(f"| {ft} | {b['n_fake']} | {ci(b['auroc'])} | {ci(b['auprc'])} | {ci(b.get('recall'))} |")
     return "\n".join(lines) + "\n"
+
+
+def paired_markdown(c: dict) -> str:
+    lines = [f"### Paired: `{c['b']}` − `{c['a']}` ({c['split']}, {c['n']} clips)", "",
+             "| Metric | a | b | b − a [95% paired CI] | CI excludes 0 |", "| --- | --- | --- | --- | --- |"]
+    for k, d in c["metrics"].items():
+        lines.append(f"| {k} | {d['a']:.4f} | {d['b']:.4f} | {d['delta']:+.4f} [{d['ci_low']:+.4f}, {d['ci_high']:+.4f}] | "
+                     f"{'yes' if d['excludes_zero'] else 'no'} |")
+    return "\n".join(lines) + "\n"
