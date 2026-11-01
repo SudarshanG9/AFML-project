@@ -3,10 +3,15 @@
 1) Freeze the operating threshold on VALIDATION (reference config, 5% real FPR):
     python scripts/m2_evaluate.py calibrate --manifest data/manifests/manifest.jsonl \
         --predictions artifacts/predictions/*.jsonl --out artifacts/reports/protocol.json
+   Freezing = this file records the threshold, the manifest hash and the
+   checkpoint hash; evaluate refuses to run if any of them changes.
 2) Evaluate every config on validation with that frozen threshold:
     python scripts/m2_evaluate.py evaluate --manifest data/manifests/manifest.jsonl \
         --predictions artifacts/predictions/*.jsonl --protocol artifacts/reports/protocol.json \
         --split val --out artifacts/reports/val
+3) Once, after the Day 9 freeze: held-out test (logged in test_access.jsonl):
+    python scripts/m2_evaluate.py evaluate ... --split test --unseal-test \
+        --purpose "final held-out run" --out artifacts/reports/test
 """
 import argparse
 import datetime as dt
@@ -18,6 +23,7 @@ import numpy as np
 from avfuse.member2_data.evaluate import evaluate_config, threshold_at_fpr
 from avfuse.member2_data.manifest import read_manifest
 from avfuse.member2_data.predictions import ContractError, by_config, join, read_predictions
+from avfuse.member2_data.seal import SealedTestError, accesses, open_test
 from avfuse.member2_data.report import config_markdown, save_json, sha256_file
 from avfuse.member2_data.splits import group_clusters
 from avfuse.shared.contracts import PRECISION_MODES
@@ -50,7 +56,7 @@ def load_protocol(a):
 def cmd_evaluate(a, manifest, preds):
     proto = load_protocol(a) if a.protocol else None
     if a.split == "test":
-        sys.exit("test evaluation is added with the Day 9 protocol freeze")
+        open_test(a.protocol, a.purpose, by_config(preds), a.unseal_test)
     if proto and proto["checkpoint_sha256"] != preds[0]["checkpoint_sha256"]:
         sys.exit("predictions come from a different checkpoint than the frozen protocol")
     clusters = group_clusters(manifest)
@@ -65,7 +71,8 @@ def cmd_evaluate(a, manifest, preds):
         print(f"{cfg:22s} AUROC {m['auroc']['value']:.4f} [{m['auroc']['ci_low']:.4f}, {m['auroc']['ci_high']:.4f}]"
               f"  AUPRC {m['auprc']['value']:.4f}{rec}")
     out = Path(a.out)
-    save_json({"split": a.split, "threshold": thr, "n_boot": a.n_boot, "seed": a.seed,
+    save_json({"split": a.split, "threshold": thr,
+               "test_accesses_so_far": len(accesses(a.protocol)) if a.protocol else 0, "n_boot": a.n_boot, "seed": a.seed,
                "manifest_sha256": sha256_file(a.manifest), "configs": results}, out / "metrics.json")
     (out / "summary.md").write_text(f"# Forensic evaluation ({a.split})\n\n" + "\n".join(md))
     print(f"wrote {out}/metrics.json and summary.md")
@@ -85,6 +92,8 @@ def main():
     e = sub.choices["evaluate"]
     e.add_argument("--protocol", default=None)
     e.add_argument("--split", choices=["val", "test"], default="val")
+    e.add_argument("--unseal-test", action="store_true")
+    e.add_argument("--purpose", default=None)
     e.add_argument("--n-boot", type=int, default=1000)
     e.add_argument("--seed", type=int, default=0)
     a = p.parse_args()
@@ -94,6 +103,8 @@ def main():
         (cmd_calibrate if a.cmd == "calibrate" else cmd_evaluate)(a, manifest, preds)
     except ContractError as err:
         sys.exit(f"CONTRACT ERROR: {err}")
+    except SealedTestError as err:
+        sys.exit(f"SEALED: {err}")
 
 
 if __name__ == "__main__":
