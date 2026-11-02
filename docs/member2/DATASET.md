@@ -47,7 +47,9 @@ would sit on real content). The exclusion counts are reported.
 
 Measured so far (test split, 28 Oct): 2,000 sampled, 1 too short, 7 fakes with the edit outside the
 window → **1,992 usable** (500 real, 499 audio_fake, 493 video_fake, 500 both_fake).
-Train/val numbers are filled in after preprocessing.
+Full build (2 Nov): 9,200 selected, 2 too short, 55 fakes with the edit outside the window ->
+**9,143 usable** (train 5,956 / val 1,195 / test 1,992). Official splits passed the source audit.
+Details: `docs/member2/results/DATASET_BUILD_RESULTS.md`.
 
 ## Preprocessing (raw clip stage)
 
