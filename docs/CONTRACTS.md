@@ -36,7 +36,32 @@ Rules encoded in the schema: measurements are `>= 0`; `peak_memory_bytes` is `nu
 
 Rules the schema **cannot** express (the Segment B writer must enforce): `len(timing_samples_ms) == repeats`; `p50_ms <= p95_ms`; `p50_ms`/`p95_ms` computed with the declared `percentile_method`. `median_ms` is `statistics.median` and may differ slightly from `p50_ms` under `lower`/`nearest_rank`.
 
-Note: the existing `benchmark_callable` computes p95 as `sorted[int(0.95*(n-1))]` (`lower`), while the config template defaults to `linear`. Segment B must reconcile these and record the method actually used.
+### 3.1 `benchmark_callable()` output is NOT a v0.2 record
+
+`avfuse.member3_runtime.benchmark.benchmark_callable()` returns an **internal measurement dictionary**. It is **not** a complete `benchmark.schema.json` v0.2 record and must not be written to JSONL as-is: the schema sets `additionalProperties: false` and several required fields are not produced by the engine. The caller (the Segment C operator benchmark, the Segment E model runner, and the Segment D writer) must build the record from it.
+
+**Engine fields that map to top-level record fields:** `device`, `warmup`, `repeats`, `timing_samples_ms`, `mean_ms`, `median_ms`, `p50_ms`, `p95_ms`, `peak_memory_bytes`, `memory_method`.
+
+**Engine fields that must be moved into the nested `measurement` object** (they are *not* valid top-level fields):
+
+| Engine key | Record location |
+|---|---|
+| `percentile_method` | `measurement.percentile_method` |
+| `synchronization` | `measurement.synchronization` |
+
+**Fields the caller must supply** (the engine never produces or guesses them): `schema_version`, `run_id`, `timestamp_utc`, `experiment_id`, `config`, `scope` (`operator` / `cached_feature_model` / `preprocessing_once`), `backend`, `precision` (including the simulated-INT8 disclosure), `batch_size`, `workload`, `environment`, and, where applicable, `conversion_overhead_ms`, `conversion_overhead_included_in_latency`, `timing_samples_ref` and `notes`. The engine times whatever callable it is given; it does not decide which configuration is scientifically valid and does not measure conversion overhead unless the caller benchmarks a conversion-only callable.
+
+**Diagnostic fields not defined in the current schema:** `peak_memory_reserved_bytes`, `memory_baseline_bytes` and `memory_note` have no top-level or nested home in v0.2. They **must not** be written as top-level fields (the record would fail validation). When serializing they should be placed inside `extensions`, under a single namespaced key, e.g.
+
+```json
+"extensions": {"benchmark_engine": {"peak_memory_reserved_bytes": 8192, "memory_baseline_bytes": 1024, "memory_note": null}}
+```
+
+They may instead be omitted (they are optional diagnostics and the schema does not require them), but `memory_note` should be kept whenever it is non-null, because it records *why* peak memory is unavailable. Omitting a field is acceptable; replacing a `null` (unavailable) value with `0` is not. The final choice and key naming are owned by the Segment D writer; this section is the interface it should follow.
+
+**Memory availability.** `peak_memory_bytes` is a number only for a CUDA device with `measure_memory=True` (`memory_method = cuda_max_memory_allocated`). It is `null` with `memory_method = not_measured` in every other case: CPU, MPS (no resettable peak counter), **and CUDA when `measure_memory=False`** (the engine then reports the memory as unavailable and sets `memory_note` to say it was disabled by the caller, and `peak_memory_reserved_bytes` and `memory_baseline_bytes` are `null`). This matches the schema rule that `peak_memory_bytes` is `null` exactly when `memory_method` is `not_measured`. With `require_memory=True` the engine raises `MemoryMeasurementUnavailableError` instead of returning `null`.
+
+**Percentile default.** `benchmark_callable` defaults to `percentile_method="linear"` (matching the config template), supports `lower` and `nearest_rank`, and reports the method actually used.
 
 ## 4. Cross-modal attention API
 
