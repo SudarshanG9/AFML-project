@@ -138,3 +138,144 @@ the declaration.
   separate callable boundaries from Member 2 (otherwise only combined stages are possible).
 - `dataset_transfer` and `archive_extraction` need an externally supplied measurement.
 - Real CUDA/MPS measurements need that hardware.
+
+## Segment D: provenance, run management and artifact integrity
+
+Segment D stores and verifies measurements; it runs no benchmark, model or dataset
+preprocessing and writes **no research artifacts**. Everything below is exercised only with
+tiny synthetic temporary files in `tests/member3/test_provenance.py` and `test_artifacts.py`.
+Benchmark schema v0.2 is still a **proposal** pending Member 1/2 review; nothing here edits it.
+
+### Hashing (`provenance.py`)
+
+| Function | Identity |
+|---|---|
+| `sha256_file(path)` | raw bytes, 1 MiB chunks; raises if the file changes while read |
+| `sha256_directory(path)` / `sha256_directory_detailed` | algorithm `sha256-directory-v1` |
+| `sha256_json(value)` / `canonical_json_bytes` | `sha256-json-sorted-v1` (**not** RFC 8785) |
+| `hash_config`, `hash_checkpoint`, `hash_cache_manifest`, `hash_feature_cache` | hash *records* naming kind, algorithm and `verified_scope` |
+
+Directory hash: files sorted by UTF-8 bytes of the NFC, `/`-separated relative path; each
+contributes `len(path) | path | size | raw file SHA-256` (fixed-width big-endian integers) under
+a versioned header. Only regular files count: empty directories, timestamps, permissions and
+absolute paths do not. Symlinks (including the root) and special files are rejected, never
+skipped; unreadable files raise; a changed file list or file mid-hash raises. Names with
+backslashes, or that collide after NFC normalization, are rejected.
+
+Canonical JSON: sorted keys, `(",", ":")` separators, UTF-8 without ASCII escaping, NaN/Infinity,
+non-string keys and unsupported types rejected. `1` and `1.0` hash differently.
+
+Identities stay separate: config, checkpoint, cache **manifest** (`manifest_file_only`),
+feature-cache **content** (`directory_contents`), run manifest and individual artifacts. A
+manifest-only digest is never reported as cache content: the record gets
+`input_identity_sha256 = null` and `extensions.provenance.cache_manifest_sha256` plus a note.
+Hashing a requested but missing input raises `MissingInputError`. Hash outside timed callables.
+
+### Run identity and layout (`artifacts.py`)
+
+`create_run_context(config, runs_root=..., ...)` generates `run-<UTC>-<16 hex>` (unique, **not** a
+content hash), validates the config against the existing config schema, hashes requested inputs
+*before* creating the directory, and writes:
+
+```text
+<runs_root>/<run_id>/
+    resolved_config.json            (reproducibility.snapshot_config)
+    environment_report.json         (existing collect_environment_report / write_report)
+    provenance.json                 hashes, git state, environment summary, disclaimers
+    benchmark_records.jsonl         schema v0.2, one record per line
+    timing_samples/<record_id>.json (only output.timing_samples_storage = separate_file)
+    stage_profile.json              (optional, avfuse_stage_profile)
+    run_manifest.json
+    integrity/artifact_hashes.json
+```
+
+Timestamps are timezone-aware UTC, ISO 8601 with a trailing `Z`. Git commit and dirty state come
+from the existing `collect_git`; a dirty tree is recorded as dirty with a warning, and an absent
+git is `null` / `state: "unavailable"`. Device names are never inferred (MPS has none). Run
+directories are not overwritten unless `output.overwrite` is true.
+
+Config interpretation: Segment D records `seed` and `torch_num_threads` but does not apply them.
+`output.directory` and `reproducibility.environment_report_path` are **not** write targets (a
+single shared report path would be overwritten across runs and fall outside the run manifest);
+each run keeps its own copy. `runs_root` is an explicit argument; the config default
+(`artifacts/benchmarks`, `artifacts/runs/...`) is flagged for team review.
+
+### Benchmark records
+
+`build_benchmark_record` / `RunContext.build_record` convert a `benchmark_callable()` dictionary
+into a v0.2 record following `docs/CONTRACTS.md`: `percentile_method` and `synchronization` go
+under `measurement`; engine diagnostics with no schema home go under
+`extensions.benchmark_engine`; unavailable memory stays `null`. Precision: `reference` is
+`native_float`; the other three are `simulated_int8` with the actual execution dtype,
+`real_int8_kernel: false` and a disclosure that the INT8 is simulated.
+
+`validate_benchmark_records` runs `Draft202012Validator` with a `FormatChecker` (the optional
+`rfc3339-validator` is not installed, so timestamps are also checked in code), then: sample count
+equals `repeats`; samples finite and non-negative; `mean/median/p50/p95` recomputed from the
+samples with the declared percentile method; `p50 <= p95`; device/synchronization/memory
+consistency (zero is allowed when measured; unavailable must be `null`); scope/boundary/backend rules;
+config-to-precision-mode mapping; `real_int8_kernel` false; no label/prediction keys in
+`extensions`; one `run_id` per batch; duplicate measurement series rejected. The whole batch is
+validated before anything is written; every problem is reported.
+
+### Writing and timing samples
+
+`write_benchmark_records` writes validated JSONL atomically (temporary sibling, fsync, atomic
+replace, or a hard-link for no-clobber). `inline` keeps `timing_samples_ms` in the record.
+`separate_file` writes `timing_samples/<record_id>.json`, reads each back, and stores a
+**run-relative** `timing_samples_ref`; `record_id` is deterministic from the series. Existing
+files are never replaced unless `overwrite`; on failure created files are removed and, with
+overwrite, replaced files are restored.
+
+### Manifest and integrity
+
+`RunContext.finalize()` (once) writes `run_manifest.json` (relative path, type, size, SHA-256,
+creation time, required flag per artifact; no absolute paths) and the anchor
+`integrity/artifact_hashes.json`. The manifest excludes itself and the anchor; its own SHA-256
+lives in the anchor, so there is no circular hash. The anchor catches accidental corruption and
+inconsistent edits; it is **not** tamper-proof against someone who rewrites both files.
+`verify_run_integrity(run_dir)` reports `valid`, `missing` (with `required`), `modified`
+(`size_mismatch` / `hash_mismatch`), `unreadable`, `invalid_entries` (traversal, absolute,
+symlink, duplicate or reserved paths), `reference_problems` and informational `unlisted_files`.
+It never modifies or repairs anything.
+
+### Stage profiles are not benchmark records
+
+`RunContext.write_stage_profile` stores a `profile_pipeline_stages()` result unchanged under
+`{"artifact_type": "avfuse_stage_profile", "artifact_version": "1.0", ...}`. No precision
+configuration or batch size is invented, `not_provided` stages stay unmeasured, composite stages
+stay distinct and no end-to-end figure is added.
+
+### Example (synthetic, temporary)
+
+```python
+import json, tempfile
+from pathlib import Path
+from avfuse.member3_runtime.artifacts import create_run_context
+from avfuse.member3_runtime.benchmark import benchmark_callable
+
+config = json.loads(Path("configs/benchmark.example.json").read_text())
+config["experiment_id"] = "demo-synthetic"
+with tempfile.TemporaryDirectory() as tmp:
+    ctx = create_run_context(config, runs_root=Path(tmp) / "runs", allow_unset_inputs=True)
+    m = benchmark_callable(lambda: sum(range(100)), "cpu", warmup=1, repeats=5)
+    rec = ctx.build_record(m, config="reference", scope="operator", backend="sdpa",
+                           batch_size=1, execution_dtype="float32",
+                           input_boundary="synthetic_tensors", input_shapes={"q": [1, 2, 3, 4]})
+    ctx.write_benchmark_records([rec])
+    ctx.finalize()
+    assert ctx.verify()["ok"]
+```
+
+### Limitations
+
+- One writer per run directory; no file locking or concurrent appending. JSONL is written in one
+  piece, not appended.
+- Overwrite is atomic per file, not across the set of files; stale sample files from an earlier
+  run with the same `run_id` can remain (and appear as `unlisted_files`).
+- Hard-link no-clobber falls back to check-then-replace on filesystems without hard links.
+- Directory hashes need a filesystem whose names survive NFC normalization unambiguously.
+- `preprocessing_once` fits the benchmark schema only with an invented precision/batch size, so
+  stage profiles use their own artifact type; this is a schema limitation for Member 1/2 review.
+- Real checkpoint/cache hashing awaits Member 1's checkpoint and Member 2's feature cache;
+  CUDA/MPS records have only been built from synthetic measurement dictionaries (no GPU/MPS run).
