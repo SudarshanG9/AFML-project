@@ -45,3 +45,19 @@ Output: `shortcut_audit.json` and `audit.md` (tables per split and type, plus th
 | `test_features_from_real_file` | 0.5 s of leading silence is measured as about 500 ms; codecs, resolution and bitrate are read |
 | `test_flags_silence_shortcut_on_whole_videos` | if fakes get extra silence on purpose, the audit flags it |
 | `test_script_runs_end_to_end` | the script reads the files and writes the report |
+
+## The follow-up control check (`scripts/m2_shortcut_control.py`)
+
+If a feature is flagged, we test whether the **detector** depends on it:
+
+1. Sort the videos into 10 groups by that feature (e.g. trailing silence).
+2. In each group, keep the **same number** of real and fake videos.
+   Now the feature looks the same in both classes and can no longer tell them apart.
+3. Measure the detector's AUROC on this matched set and compare it with all videos.
+
+- AUROC **stays about the same**: the detector isn't using the shortcut.
+- AUROC **drops a lot**: part of its score came from the shortcut. Report it.
+
+The report also shows the feature's own AUROC on the matched set (it should be about 0.5),
+which proves the matching worked. `m2_audit_whole.py` saves `video_features.csv` (one row per
+video) as the input for this step.
