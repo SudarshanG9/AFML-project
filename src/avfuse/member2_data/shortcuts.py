@@ -45,13 +45,18 @@ def silence_profile(audio: np.ndarray, sr: int = SAMPLE_RATE) -> dict:
 
 
 def probe_media(path: str) -> dict:
-    """Codec, sample rate, fps, resolution via ffprobe (raw video must exist)."""
+    """Codec, sample rate, fps, resolution, bitrate and file size via ffprobe (raw video must exist)."""
     try:
-        info = json.loads(subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-of", "json", path],
-                                         capture_output=True, check=True, text=True).stdout)
+        info = json.loads(subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json",
+                                          path], capture_output=True, check=True, text=True).stdout)
     except (OSError, subprocess.CalledProcessError):
         return {}
     out = {}
+    fmt = info.get("format", {})
+    if fmt.get("bit_rate"):
+        out["container_bitrate_kbps"] = float(fmt["bit_rate"]) / 1000.0
+    if fmt.get("size"):
+        out["file_size_mb"] = float(fmt["size"]) / 1e6
     for st in info.get("streams", []):
         if st.get("codec_type") == "audio":
             out.update(audio_codec=st.get("codec_name"), audio_sample_rate=st.get("sample_rate"))
@@ -130,3 +135,47 @@ def shortcut_audit(manifest: Sequence[Mapping], features: Mapping[str, dict]) ->
         report["splits"][split] = block
     report["passed"] = not report["flags"]
     return report
+
+
+# ---------------------------------------------------------------- whole videos (DiMoDif unit)
+
+def video_audio(path: str) -> np.ndarray:
+    """Whole audio track as float32 mono 16 kHz (same decode settings as the clip pipeline)."""
+    from avfuse.member2_data.lavdf import _ffmpeg
+    raw = _ffmpeg(["-i", path, "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"])
+    return np.frombuffer(raw, dtype=np.float32)
+
+
+def whole_video_features(video: Mapping, probe: bool = True) -> dict:
+    """video: a videos_whole.csv row. No cut position exists here: every video is used whole,
+    so the cut-position shortcut of the clip pipeline cannot occur."""
+    f: dict = {"duration_s": float(video["duration_s"]), "n_frames": float(video["n_frames"])}
+    try:
+        audio = video_audio(video["path"])
+        f.update(silence_profile(audio))
+        f["audio_duration_s"] = len(audio) / SAMPLE_RATE
+    except (OSError, subprocess.CalledProcessError) as e:
+        f["audio_error"] = type(e).__name__
+    if probe:
+        f.update(probe_media(video["path"]))
+    return f
+
+
+def audit_markdown(rep: dict, title: str = "Shortcut (leakage) audit") -> str:
+    lines = [f"# {title}", "", f"Rule fixed in advance: a feature is flagged if it alone separates real from fake "
+             f"with AUROC >= {FLAG_AUROC} (0.5 = useless, 1.0 = perfect shortcut).", ""]
+    fmt = lambda v: "" if v is None else f"{v:.3g}"
+    for split, block in rep["splits"].items():
+        for group, feats in block.items():
+            lines += [f"## {split} / {group}", "", "| Feature | real median | fake median | shortcut AUROC | flag |",
+                      "| --- | --- | --- | --- | --- |"]
+            for n, s in feats.items():
+                if "values_real_fake" in s:
+                    vals = ", ".join(f"{k}: {v[0]} real / {v[1]} fake" for k, v in list(s["values_real_fake"].items())[:4])
+                    lines.append(f"| {n} | {vals} | | {s['shortcut_auroc']:.3f} | {'**FLAG**' if s['flag'] else ''} |")
+                else:
+                    lines.append(f"| {n} | {fmt(s.get('real_median'))} | {fmt(s.get('fake_median'))} | "
+                                 f"{s['shortcut_auroc']:.3f} | {'**FLAG**' if s['flag'] else ''} |")
+            lines.append("")
+    lines += ["## Flags", ""] + ([f"- {f}" for f in rep["flags"]] or ["- none"])
+    return "\n".join(lines) + "\n"
