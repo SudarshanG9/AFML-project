@@ -22,6 +22,15 @@ python scripts/validate_manifest.py data/manifests/manifest.jsonl
 
 A `manifest.csv` from the earlier Colab pipeline can be passed to `--clips` as is (same columns).
 
+## Whole-video manifest for DiMoDif (val + test)
+
+DiMoDif reads whole videos, so its manifest has one row per video (same sample as above):
+
+```bash
+python scripts/m2_whole_video_manifest.py --root data/raw/LAV-DF --cap val=300 test=500 \
+    --out data/manifests/manifest_whole.jsonl --videos-out data/manifests/videos_whole.csv --check-files
+```
+
 ## Day 11 (run as soon as the clips exist, rerun before sign-off): shortcut audit
 
 ```bash
