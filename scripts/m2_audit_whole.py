@@ -6,9 +6,11 @@
 For every video: leading/trailing silence and loudness of the whole audio track, duration,
 frame count, and (ffprobe) codecs, sample rate, fps, resolution, bitrate and file size.
 Each feature is flagged if it alone separates real from fake with AUROC >= 0.65 (rule fixed in
-advance), per split, overall and per fake type. Writes shortcut_audit.json and audit.md.
+advance), per split, overall and per fake type. Writes shortcut_audit.json, audit.md and
+video_features.csv (per-video numeric features, the input for scripts/m2_shortcut_control.py).
 """
 import argparse
+import csv
 import json
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
@@ -46,6 +48,13 @@ def main():
     rep["audio_errors"] = errors
     out = Path(a.out)
     save_json(rep, out / "shortcut_audit.json")
+    # Per-video numeric features (metadata only, stays out of git): input for m2_shortcut_control.py
+    names = sorted({k for f in feats.values() for k, v in f.items() if isinstance(v, (int, float))})
+    with open(out / "video_features.csv", "w", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(["video_id"] + names)
+        for vid, f in feats.items():
+            w.writerow([vid] + [f.get(n, "") for n in names])
     (out / "audit.md").write_text(audit_markdown(rep, "Shortcut (leakage) audit: whole videos"))
     print(f"{len(videos)} videos, {errors} audio read error(s)")
     for split, block in rep["splits"].items():
