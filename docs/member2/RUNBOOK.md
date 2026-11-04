@@ -31,6 +31,25 @@ python scripts/m2_whole_video_manifest.py --root data/raw/LAV-DF --cap val=300 t
     --out data/manifests/manifest_whole.jsonl --videos-out data/manifests/videos_whole.csv --check-files
 ```
 
+## DiMoDif features (GPU, val + test)
+
+DiMoDif needs PyTorch 2.5.1 and MediaPipe 0.10.15, which have no wheels for Colab's newer
+Python, so the extraction runs in a separate Python 3.10 environment:
+
+```bash
+git clone --depth 1 https://github.com/mpc001/Visual_Speech_Recognition_for_Multiple_Languages /content/vsr
+pip install uv gdown
+uv venv /content/py310 --python 3.10
+uv pip install --python /content/py310/bin/python torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 \
+    --index-url https://download.pytorch.org/whl/cu121
+uv pip install --python /content/py310/bin/python "numpy<2" mediapipe==0.10.15 hydra-core av scikit-image scipy six opencv-python jsonschema
+uv pip install --python /content/py310/bin/python -e . --no-deps
+# encoder models into /content/vsr/data: LRS3_V_WER19.1 (http://bit.ly/40EAtyX), LRS3_A_WER1.0 (http://bit.ly/3ZSdh0l)
+/content/py310/bin/python scripts/m2_dimodif_features.py --videos data/manifests/videos_whole.csv \
+    --vsr-dir /content/vsr --out <drive>/dimodif_emb --split all
+```
+Resumable: rerunning skips finished videos. Results: `docs/member2/results/FEATURE_CACHE_RESULTS.md`.
+
 ## Day 11 (run as soon as the clips exist, rerun before sign-off): shortcut audit
 
 ```bash
