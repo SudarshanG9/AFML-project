@@ -14,10 +14,18 @@ Differences from DiMoDif's external/features.py, none of which changes the featu
         --vsr-dir /content/vsr --out data/dimodif_emb --limit 1        # one-video test
     python scripts/m2_dimodif_features.py ... --split test              # all test videos (resumable)
     python scripts/m2_dimodif_features.py --summarize-only --out data/dimodif_emb
+
+On Colab, run it with a separate Python 3.10 env (DiMoDif's PyTorch 2.5.1 / MediaPipe 0.10.15
+have no wheels for newer Pythons); see docs/member2/RUNBOOK.md.
 """
 import argparse
 import json
 import os
+
+# Colab sets MPLBACKEND to its notebook backend, which a separate Python env cannot load;
+# MediaPipe imports matplotlib at start-up, so fall back to the plain "Agg" backend.
+if os.environ.get("MPLBACKEND", "").startswith("module://"):
+    os.environ["MPLBACKEND"] = "Agg"
 import platform
 import sys
 import time
