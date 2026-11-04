@@ -68,3 +68,6 @@ def test_script_runs_end_to_end(tmp_path):
     assert r.returncode == 0, r.stderr
     assert "8 videos, 0 audio read error(s)" in r.stdout
     assert (tmp_path / "audit" / "audit.md").read_text().startswith("# Shortcut (leakage) audit: whole videos")
+    import csv
+    rows = list(csv.DictReader(open(tmp_path / "audit" / "video_features.csv")))
+    assert len(rows) == 8 and "trailing_silence_ms" in rows[0] and rows[0]["video_id"].startswith("vid")
