@@ -1,1 +1,97 @@
+# ==========================================
+# AVFuse-CausalQ - Git Ignore
+# Track source, tests, schemas, docs and example configs.
+# Keep local datasets, checkpoints, caches and generated outputs out of Git.
+# ==========================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Editors and temporary files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# External / vendored repositories
 third_party/
+
+# Datasets, feature caches and manifests.
+# Keep README placeholders; do not commit dataset contents.
+/data/*
+!/data/README.md
+!/data/*/
+/data/*/*
+!/data/*/README.md
+
+# Model checkpoints. Keep the explanatory README.
+/checkpoints/*
+!/checkpoints/README.md
+
+# Generated predictions, benchmarks, reports and run artifacts.
+/artifacts/*
+!/artifacts/README.md
+
+# Model weights and serialized tensor caches
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.npy
+*.npz
+
+# Audio/video media
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.wav
+*.flac
+*.mp3
+*.m4a
+*.aac
+*.ogg
+
+# Experiment tracking
+wandb/
+mlruns/
+
+# Machine-specific config overrides
+configs/*.local.json
