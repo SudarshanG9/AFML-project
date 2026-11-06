@@ -16,7 +16,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from src.avfuse.shared.contracts import PrecisionMode
+from avfuse.shared.contracts import PrecisionMode
 from .model_adapter import ModelAdapter
 
 
