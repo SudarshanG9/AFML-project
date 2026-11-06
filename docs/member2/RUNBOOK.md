@@ -72,6 +72,22 @@ python scripts/m2_evaluate.py evaluate --manifest $M --predictions $P --protocol
     --split test --unseal-test --purpose "final held-out run" --out artifacts/reports/test
 ```
 
+## When Member 1's predictions arrive (whole videos)
+
+```bash
+M=data/manifests/manifest_whole.jsonl
+P="reference_val.jsonl"            # later: all four configs' files
+# 1. contract + checkpoint hash + score direction (stops if INVERTED)
+python scripts/m2_check_predictions.py --manifest $M --predictions $P --out artifacts/reports/check.json
+# 2-3. freeze the threshold on reference val, then evaluate val
+python scripts/m2_evaluate.py calibrate --manifest $M --predictions $P --out artifacts/reports/protocol.json
+python scripts/m2_evaluate.py evaluate --manifest $M --predictions $P --protocol artifacts/reports/protocol.json \
+    --split val --out artifacts/reports/val
+# overlap with the checkpoint's training data (needs LAV-DF metadata.json)
+python scripts/m2_train_overlap.py --metadata data/raw/LAV-DF/metadata.json --manifest $M \
+    --out artifacts/reports/train_overlap.json
+```
+
 ## What to commit
 
 Code, tests, docs and small synthetic fixtures only. Results go in the report; if the team wants a
