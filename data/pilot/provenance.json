@@ -1,0 +1,45 @@
+{
+  "video_id": "2961dde91d90fee1",
+  "split": "val",
+  "original_path": "data/raw/LAV-DF/dev/004162.mp4",
+  "arrays": {
+    "video_features": {
+      "shape": [
+        193,
+        768
+      ],
+      "dtype": "float32"
+    },
+    "audio_features": {
+      "shape": [
+        195,
+        768
+      ],
+      "dtype": "float32"
+    }
+  },
+  "video_encoder": "auto-AVSR LRS3_V_WER19.1 (mpc001/Visual_Speech_Recognition_for_Multiple_Languages)",
+  "audio_encoder": "auto-AVSR LRS3_A_WER1.0 (same repo)",
+  "face_detector": "MediaPipe",
+  "extraction_code": "scripts/m2_dimodif_features.py on branch feature/member2-data",
+  "environment": {
+    "python": "3.10.22",
+    "torch": "2.5.1+cu121",
+    "torchvision": "0.20.1+cu121",
+    "torchaudio": "2.5.1+cu121",
+    "device": "cuda:0",
+    "gpu": "Tesla T4",
+    "mediapipe": "0.10.15"
+  },
+  "dimodif_checkpoint_expected": {
+    "file": "dfd_lavdf_reduceonplateau_64_4_1_5_True.pth",
+    "sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e"
+  },
+  "note": "DiMoDif loader truncates both arrays to min(T_v, T_a) and zero-pads to 600",
+  "sha256": {
+    "004162.mp4": "6c6b807ccc7344992d332d2f84c9a0e734ecd637ee9f475218ef0c91de593355",
+    "features.npz": "72a28d88d48e799eef60e0e81a2db4e2f25872bb6ace2a5639f79d02a3b35d57",
+    "manifest_row.json": "8db5422fb62c5199acc0d0047be3761230cbd4f13042725e249cfca760936116",
+    "meta.json": "812705f68519a8b9816abbeec1d2953a034a38a8d709d12f967cee0296e26661"
+  }
+}
