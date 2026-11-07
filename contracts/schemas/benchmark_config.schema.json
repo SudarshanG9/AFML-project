@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Benchmark run configuration (proposed config_version 0.1)",
+  "description": "Validates configs/benchmark.example.json and derived run configs. PROPOSAL pending review by Member 1 and Member 2. null means 'unset'; the runner must refuse a real run while required real-world inputs (checkpoint, cache manifest, shapes file) are null or experiment_id starts with UNSET_.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config_version", "experiment_id", "device", "on_device_unavailable", "backends", "configs",
+    "batch_size", "warmup", "repeats", "measure_scopes", "preprocessing_scope",
+    "operator_shapes_source", "operator_shapes_file", "input_boundary", "checkpoint_path",
+    "cache_manifest_path", "synchronization", "peak_memory",
+    "peak_memory_reset_before_measurement", "percentile_method", "conversion_overhead",
+    "output", "reproducibility"
+  ],
+  "properties": {
+    "config_version": { "const": "0.1" },
+    "experiment_id": { "type": "string", "minLength": 1 },
+    "device": {
+      "type": "string",
+      "pattern": "^(auto|cpu|cuda(:[0-9]+)?|mps)$",
+      "description": "Requested device. 'auto' lets the runner choose and record the actual device."
+    },
+    "on_device_unavailable": {
+      "enum": ["error", "fallback_to_cpu"],
+      "description": "What to do if the requested device is missing. 'error' avoids silent substitution."
+    },
+    "backends": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "enum": ["sdpa", "dense_oracle", "custom_tiled"] }
+    },
+    "configs": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "enum": ["reference", "low_precision", "restore_value_output", "restore_query"] }
+    },
+    "batch_size": { "type": "integer", "minimum": 1 },
+    "warmup": { "type": "integer", "minimum": 0 },
+    "repeats": { "type": "integer", "minimum": 1 },
+    "measure_scopes": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "enum": ["operator", "cached_feature_model"] },
+      "description": "Repeated scopes. preprocessing_once is controlled by preprocessing_scope."
+    },
+    "preprocessing_scope": { "enum": ["record_once_separately", "disabled"] },
+    "operator_shapes_source": { "enum": ["observed_tensor_shapes", "user_supplied", "synthetic_smoke"] },
+    "operator_shapes_file": { "type": ["string", "null"], "minLength": 1 },
+    "input_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "cached_feature_model", "preprocessing_once", "disclosure"],
+      "properties": {
+        "operator": { "enum": ["synthetic_tensors", "cached_encoder_tokens"] },
+        "cached_feature_model": { "enum": ["synthetic_tensors", "cached_encoder_tokens"] },
+        "preprocessing_once": { "const": "raw_media" },
+        "disclosure": { "type": "string", "minLength": 1 }
+      }
+    },
+    "checkpoint_path": { "type": ["string", "null"], "minLength": 1 },
+    "cache_manifest_path": { "type": ["string", "null"], "minLength": 1 },
+    "synchronization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "after_warmup", "around_each_repeat"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "after_warmup": { "type": "boolean" },
+        "around_each_repeat": { "type": "boolean" }
+      }
+    },
+    "peak_memory": { "enum": ["cuda_allocator_peak_if_available_else_null", "disabled"] },
+    "peak_memory_reset_before_measurement": { "type": "boolean" },
+    "percentile_method": { "enum": ["linear", "lower", "nearest_rank"] },
+    "conversion_overhead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["measure", "included_in_latency"],
+      "properties": {
+        "measure": { "type": "boolean" },
+        "included_in_latency": { "type": "boolean" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directory", "format", "timing_samples_storage", "overwrite"],
+      "properties": {
+        "directory": { "type": "string", "minLength": 1 },
+        "format": { "const": "jsonl" },
+        "timing_samples_storage": { "enum": ["inline", "separate_file"] },
+        "overwrite": { "type": "boolean" }
+      }
+    },
+    "reproducibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seed", "torch_num_threads", "record_git_commit", "record_environment_report",
+        "environment_report_path", "hash_checkpoint", "hash_input_cache", "snapshot_config"
+      ],
+      "properties": {
+        "seed": { "type": "integer", "minimum": 0 },
+        "torch_num_threads": { "type": ["integer", "null"], "minimum": 1 },
+        "record_git_commit": { "type": "boolean" },
+        "record_environment_report": { "type": "boolean" },
+        "environment_report_path": { "type": "string", "minLength": 1 },
+        "hash_checkpoint": { "type": "boolean" },
+        "hash_input_cache": { "type": "boolean" },
+        "snapshot_config": { "type": "boolean" }
+      }
+    }
+  }
+}
