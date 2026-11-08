@@ -3,7 +3,9 @@ pyproject.toml
 src/avfuse/__init__.py
 src/avfuse/member1_fusion/__init__.py
 src/avfuse/member1_fusion/attention.py
+src/avfuse/member1_fusion/day2_probe.py
 src/avfuse/member1_fusion/diagnostic_model.py
+src/avfuse/member1_fusion/dimodif_adapter.py
 src/avfuse/member1_fusion/model_adapter.py
 src/avfuse/member1_fusion/precision.py
 src/avfuse/member2_data/__init__.py

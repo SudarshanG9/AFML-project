@@ -1,0 +1,12 @@
+{
+  "clip_id": "2961dde91d90fee1",
+  "dataset": "lavdf",
+  "duration_s": 7.872,
+  "feature_path": "data/cache/2961dde91d90fee1.pt",
+  "identity_id": "lavdf:004161",
+  "label": 1,
+  "manipulation_type": "both_fake",
+  "notes": "identity_id = source_id: LAV-DF has no speaker metadata; unit = whole video (DiMoDif input)",
+  "source_id": "lavdf:004161",
+  "split": "val"
+}
