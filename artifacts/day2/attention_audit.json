@@ -1,0 +1,234 @@
+{
+  "checkpoint_sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e",
+  "feature_file": "data/day2_features/features1.npz",
+  "valid_length": 235,
+  "fake_score": 0.9999679327011108,
+  "config": {
+    "d_model": 64,
+    "nhead": 4,
+    "nlayers": 5,
+    "max_length": 600,
+    "win_size": 15
+  },
+  "attention_mask": {
+    "mask_present": true,
+    "shape": [
+      1202,
+      1202
+    ],
+    "true_means": "blocked",
+    "video_to_audio_allowed": 8944,
+    "audio_to_video_allowed": 8944,
+    "cls_to_video_allowed": 600,
+    "cls_to_audio_allowed": 600,
+    "sep_to_video_allowed": 600,
+    "sep_to_audio_allowed": 600
+  },
+  "layers": [
+    {
+      "layer": 0,
+      "self_attention": true,
+      "input_shape": [
+        1,
+        1202,
+        64
+      ],
+      "Q_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "K_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "V_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "dtype": "torch.float32",
+      "N_q": 1202,
+      "N_k": 1202,
+      "head_dim": 16,
+      "attention_mask_shape": [
+        1202,
+        1202
+      ],
+      "Q_max_abs": 11.524554252624512,
+      "K_max_abs": 14.764389991760254,
+      "V_max_abs": 16.997817993164062,
+      "mask_received": true,
+      "mask_matches_original": true,
+      "key_padding_mask_received": false
+    },
+    {
+      "layer": 1,
+      "self_attention": true,
+      "input_shape": [
+        1,
+        1202,
+        64
+      ],
+      "Q_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "K_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "V_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "dtype": "torch.float32",
+      "N_q": 1202,
+      "N_k": 1202,
+      "head_dim": 16,
+      "attention_mask_shape": [
+        1202,
+        1202
+      ],
+      "Q_max_abs": 4.668214321136475,
+      "K_max_abs": 6.2426934242248535,
+      "V_max_abs": 4.527595043182373,
+      "mask_received": true,
+      "mask_matches_original": true,
+      "key_padding_mask_received": false
+    },
+    {
+      "layer": 2,
+      "self_attention": true,
+      "input_shape": [
+        1,
+        1202,
+        64
+      ],
+      "Q_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "K_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "V_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "dtype": "torch.float32",
+      "N_q": 1202,
+      "N_k": 1202,
+      "head_dim": 16,
+      "attention_mask_shape": [
+        1202,
+        1202
+      ],
+      "Q_max_abs": 4.0969367027282715,
+      "K_max_abs": 5.528528690338135,
+      "V_max_abs": 3.389469861984253,
+      "mask_received": true,
+      "mask_matches_original": true,
+      "key_padding_mask_received": false
+    },
+    {
+      "layer": 3,
+      "self_attention": true,
+      "input_shape": [
+        1,
+        1202,
+        64
+      ],
+      "Q_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "K_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "V_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "dtype": "torch.float32",
+      "N_q": 1202,
+      "N_k": 1202,
+      "head_dim": 16,
+      "attention_mask_shape": [
+        1202,
+        1202
+      ],
+      "Q_max_abs": 3.09942889213562,
+      "K_max_abs": 3.8192505836486816,
+      "V_max_abs": 2.7407102584838867,
+      "mask_received": true,
+      "mask_matches_original": true,
+      "key_padding_mask_received": false
+    },
+    {
+      "layer": 4,
+      "self_attention": true,
+      "input_shape": [
+        1,
+        1202,
+        64
+      ],
+      "Q_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "K_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "V_shape": [
+        1,
+        4,
+        1202,
+        16
+      ],
+      "dtype": "torch.float32",
+      "N_q": 1202,
+      "N_k": 1202,
+      "head_dim": 16,
+      "attention_mask_shape": [
+        1202,
+        1202
+      ],
+      "Q_max_abs": 4.014645576477051,
+      "K_max_abs": 4.414828777313232,
+      "V_max_abs": 2.7315635681152344,
+      "mask_received": true,
+      "mask_matches_original": true,
+      "key_padding_mask_received": false
+    }
+  ]
+}
