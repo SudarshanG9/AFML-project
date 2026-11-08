@@ -1,0 +1,213 @@
+{
+  "model": "dimodif",
+  "checkpoint_name": "lavdf",
+  "checkpoint_sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e",
+  "device": "mps",
+  "torch_version": "2.5.1",
+  "n_samples": 1,
+  "samples": [
+    {
+      "clip_id": "data",
+      "path": "data/pilot/features.npz",
+      "valid_length": 193,
+      "reference": 0.9999445080757141,
+      "zero_audio": 0.999975323677063,
+      "zero_video": 0.9999029040336609,
+      "delta_zero_audio": 3.081560134887695e-05,
+      "delta_zero_video": -4.1604042053222656e-05,
+      "fusion_qkv_trace": [
+        {
+          "layer": 0,
+          "module": "transformer_encoder.layers.0.self_attn",
+          "qkv_head_shapes": [
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ]
+          ],
+          "qkv_abs_means": [
+            0.718258261680603,
+            1.6706757545471191,
+            1.0894581079483032
+          ],
+          "input_dtype": "torch.float32",
+          "attention_mask_shape": [
+            1202,
+            1202
+          ],
+          "input_tensors_shared": true
+        },
+        {
+          "layer": 1,
+          "module": "transformer_encoder.layers.1.self_attn",
+          "qkv_head_shapes": [
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ]
+          ],
+          "qkv_abs_means": [
+            1.0358426570892334,
+            1.5573358535766602,
+            0.6943406462669373
+          ],
+          "input_dtype": "torch.float32",
+          "attention_mask_shape": [
+            1202,
+            1202
+          ],
+          "input_tensors_shared": true
+        },
+        {
+          "layer": 2,
+          "module": "transformer_encoder.layers.2.self_attn",
+          "qkv_head_shapes": [
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ]
+          ],
+          "qkv_abs_means": [
+            1.0083216428756714,
+            1.5166016817092896,
+            0.5891165137290955
+          ],
+          "input_dtype": "torch.float32",
+          "attention_mask_shape": [
+            1202,
+            1202
+          ],
+          "input_tensors_shared": true
+        },
+        {
+          "layer": 3,
+          "module": "transformer_encoder.layers.3.self_attn",
+          "qkv_head_shapes": [
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ]
+          ],
+          "qkv_abs_means": [
+            0.8472728729248047,
+            1.0156896114349365,
+            0.585750937461853
+          ],
+          "input_dtype": "torch.float32",
+          "attention_mask_shape": [
+            1202,
+            1202
+          ],
+          "input_tensors_shared": true
+        },
+        {
+          "layer": 4,
+          "module": "transformer_encoder.layers.4.self_attn",
+          "qkv_head_shapes": [
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ],
+            [
+              1,
+              4,
+              1202,
+              16
+            ]
+          ],
+          "qkv_abs_means": [
+            0.7990657687187195,
+            1.2133407592773438,
+            0.5313190221786499
+          ],
+          "input_dtype": "torch.float32",
+          "attention_mask_shape": [
+            1202,
+            1202
+          ],
+          "input_tensors_shared": true
+        }
+      ],
+      "cross_modal_mask": {
+        "mask_shape": [
+          1202,
+          1202
+        ],
+        "mask_present": true,
+        "valid_tokens_per_modality": 193,
+        "video_to_audio_permitted_pairs": 2839,
+        "audio_to_video_permitted_pairs": 2839,
+        "all_cross_pairs_per_direction": 37249,
+        "cross_modal_attention_possible": true,
+        "padding_tokens_per_modality": 407,
+        "has_src_key_padding_mask": false
+      }
+    }
+  ],
+  "mean_abs_delta_audio": 3.081560134887695e-05,
+  "mean_abs_delta_video": 4.1604042053222656e-05
+}

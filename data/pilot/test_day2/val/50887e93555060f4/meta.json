@@ -1,0 +1,28 @@
+{
+  "video_id": "50887e93555060f4",
+  "split": "val",
+  "n_frames": 172,
+  "environment": {
+    "python": "3.10.22",
+    "torch": "2.5.1+cu121",
+    "torchvision": "0.20.1+cu121",
+    "torchaudio": "2.5.1+cu121",
+    "device": "cuda:0",
+    "gpu": "Tesla T4",
+    "mediapipe": "0.10.15"
+  },
+  "status": "ok",
+  "T_v": 172,
+  "D_v": 768,
+  "T_a": 172,
+  "D_a": 768,
+  "dtype": "float32",
+  "frames_no_landmarks": 0,
+  "timings_ms": {
+    "landmarks_ms": 1847.33,
+    "video_load_crop_ms": 374.7,
+    "audio_load_ms": 5.71,
+    "video_encode_ms": 97.44,
+    "audio_encode_ms": 63.75
+  }
+}
