@@ -1,1 +1,65 @@
+# Third-party dependencies
 third_party/
+
+# Byte-compiled / optimized / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Packaging & distribution
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tooling and test caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environment & secrets
+.env
+.env.*
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Local research data & raw media (preserves data/README.md)
+data/*
+!data/README.md
+*.npz
+*.npy
+*.mp4
+*.avi
+*.wav
+*.mp3
+*.zip
+*.tar
+*.tar.gz
+
+# Model checkpoints & weights (preserves checkpoints/README.md)
+checkpoints/*
+!checkpoints/README.md
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+
+# Generated run artifacts & ablation reports (preserves artifacts/README.md)
+artifacts/*
+!artifacts/README.md
