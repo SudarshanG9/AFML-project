@@ -42,7 +42,12 @@ ENV/
 
 # Operating system metadata
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
+ehthumbs.db
 desktop.ini
 
 # Logs
@@ -77,10 +82,14 @@ third_party/
 *.pt
 *.pth
 *.ckpt
+*.bin
 *.safetensors
 *.onnx
 *.npy
 *.npz
+*.zip
+*.tar
+*.tar.gz
 
 # Audio/video media
 *.mp4
