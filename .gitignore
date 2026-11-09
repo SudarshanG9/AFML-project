@@ -1,17 +1,25 @@
-# Third-party dependencies
-third_party/
+# ==========================================
+# AVFuse-CausalQ - Git Ignore
+# Track source, tests, schemas, docs and example configs.
+# Keep local datasets, checkpoints, caches and generated outputs out of Git.
+# ==========================================
 
-# Byte-compiled / optimized / cache files
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Packaging & distribution
 *.egg-info/
-*.egg
+.eggs/
 build/
 dist/
-.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
 
 # Virtual environments
 .venv/
@@ -19,17 +27,20 @@ venv/
 env/
 ENV/
 
-# Tooling and test caches
-.pytest_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# Local environment & secrets
+# Local environment files and secrets
 .env
 .env.*
+!.env.example
 
-# OS-specific files
+# Editors and temporary files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# Operating system metadata
 .DS_Store
 .DS_Store?
 ._*
@@ -37,29 +48,65 @@ htmlcov/
 .Trashes
 Thumbs.db
 ehthumbs.db
+desktop.ini
 
-# Local research data & raw media (preserves data/README.md)
-data/*
-!data/README.md
-*.npz
-*.npy
-*.mp4
-*.avi
-*.wav
-*.mp3
-*.zip
-*.tar
-*.tar.gz
+# Logs
+*.log
 
-# Model checkpoints & weights (preserves checkpoints/README.md)
-checkpoints/*
-!checkpoints/README.md
+# External / vendored repositories
+third_party/
+
+# Datasets, feature caches and manifests.
+# Keep README placeholders; do not commit dataset contents.
+/data/*
+!/data/README.md
+!/data/*/
+/data/*/*
+!/data/*/README.md
+
+# Model checkpoints. Keep README placeholders, including one level down.
+/checkpoints/*
+!/checkpoints/README.md
+!/checkpoints/*/
+/checkpoints/*/*
+!/checkpoints/*/README.md
+
+# Generated predictions, benchmarks, reports and run artifacts.
+/artifacts/*
+!/artifacts/README.md
+!/artifacts/*/
+/artifacts/*/*
+!/artifacts/*/README.md
+
+# Model weights and serialized tensor caches
 *.pt
 *.pth
 *.ckpt
 *.bin
 *.safetensors
+*.onnx
+*.npy
+*.npz
+*.zip
+*.tar
+*.tar.gz
 
-# Generated run artifacts & ablation reports (preserves artifacts/README.md)
-artifacts/*
-!artifacts/README.md
+# Audio/video media
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.wav
+*.flac
+*.mp3
+*.m4a
+*.aac
+*.ogg
+
+# Experiment tracking
+wandb/
+mlruns/
+
+# Machine-specific config overrides
+configs/*.local.json
