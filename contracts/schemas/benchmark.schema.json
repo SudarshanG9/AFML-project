@@ -1,23 +1,51 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Measured runtime benchmark",
+  "title": "Measured runtime benchmark record (proposed schema_version 0.2)",
+  "description": "One JSONL row per benchmark series (one config x device x backend x scope). PROPOSAL pending review by Member 1 and Member 2 (see docs/CONTRACTS.md). Cross-field rules that JSON Schema cannot express are listed in docs/CONTRACTS.md and must be enforced by the Member 3 writer: len(timing_samples_ms) == repeats; p50_ms <= p95_ms. Unknown fields are rejected; use 'extensions' for deliberate extras.",
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema_version",
     "run_id",
+    "timestamp_utc",
+    "experiment_id",
     "config",
+    "scope",
     "device",
     "backend",
-    "scope",
+    "precision",
     "batch_size",
+    "warmup",
     "repeats",
+    "workload",
+    "mean_ms",
+    "median_ms",
     "p50_ms",
     "p95_ms",
-    "peak_memory_bytes"
+    "measurement",
+    "peak_memory_bytes",
+    "memory_method",
+    "environment"
   ],
   "properties": {
+    "schema_version": {
+      "const": "0.2",
+      "description": "Version of this record layout."
+    },
     "run_id": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+      "description": "UTC time the series was recorded, ISO 8601 with a trailing Z."
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identifier of the experiment/configuration file or sweep."
     },
     "config": {
       "enum": [
@@ -25,53 +53,560 @@
         "low_precision",
         "restore_value_output",
         "restore_query"
-      ]
-    },
-    "device": {
-      "type": "string"
-    },
-    "backend": {
-      "type": "string"
+      ],
+      "description": "Agreed precision configuration identifier (semantics owned by Member 1)."
     },
     "scope": {
       "enum": [
         "operator",
         "cached_feature_model",
         "preprocessing_once"
+      ],
+      "description": "operator = fusion operator only; cached_feature_model = cached-feature fusion + head; preprocessing_once = one-time raw-media preprocessing."
+    },
+    "device": {
+      "type": "string",
+      "pattern": "^(cpu|cuda(:[0-9]+)?|mps)$",
+      "description": "Device the timed work actually ran on."
+    },
+    "backend": {
+      "enum": [
+        "sdpa",
+        "dense_oracle",
+        "custom_tiled",
+        "none"
+      ],
+      "description": "Attention implementation timed; 'none' when there is no attention operator."
+    },
+    "precision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "execution_dtype",
+        "simulated",
+        "real_int8_kernel",
+        "disclosure"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "native_float",
+            "simulated_int8"
+          ],
+          "description": "native_float = no quantization emulation; simulated_int8 = symmetric fake quantization carried out in floating point."
+        },
+        "execution_dtype": {
+          "enum": [
+            "float32",
+            "float16",
+            "bfloat16",
+            "float64"
+          ],
+          "description": "Tensor dtype the arithmetic actually ran in."
+        },
+        "simulated": {
+          "type": "boolean",
+          "description": "True when low precision is emulated rather than executed."
+        },
+        "real_int8_kernel": {
+          "const": false,
+          "description": "Always false: no real INT8 kernel is benchmarked."
+        },
+        "disclosure": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable statement of simulated vs actual execution."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "simulated_int8"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "simulated": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "simulated": {
+                "const": false
+              }
+            }
+          }
+        }
       ]
     },
     "batch_size": {
       "type": "integer",
       "minimum": 1
     },
+    "warmup": {
+      "type": "integer",
+      "minimum": 0
+    },
     "repeats": {
       "type": "integer",
       "minimum": 1
     },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_boundary",
+        "input_shapes",
+        "input_duration_seconds",
+        "checkpoint_sha256",
+        "input_identity_sha256"
+      ],
+      "properties": {
+        "input_boundary": {
+          "enum": [
+            "synthetic_tensors",
+            "cached_encoder_tokens",
+            "raw_media"
+          ],
+          "description": "What the timed work consumed. Cached model latency excludes raw media."
+        },
+        "input_shapes": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/tensorShape"
+          },
+          "description": "Input tensor name -> shape; null when not applicable/unknown."
+        },
+        "input_duration_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "checkpoint_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_identity_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Hash identifying the input/cache content."
+        }
+      }
+    },
+    "mean_ms": {
+      "$ref": "#/$defs/nonNegativeNumber"
+    },
+    "median_ms": {
+      "$ref": "#/$defs/nonNegativeNumber"
+    },
     "p50_ms": {
-      "type": "number",
-      "minimum": 0
+      "$ref": "#/$defs/nonNegativeNumber"
     },
     "p95_ms": {
-      "type": "number",
-      "minimum": 0
+      "$ref": "#/$defs/nonNegativeNumber"
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "percentile_method",
+        "synchronization"
+      ],
+      "properties": {
+        "percentile_method": {
+          "enum": [
+            "linear",
+            "lower",
+            "nearest_rank"
+          ],
+          "description": "How p50/p95 were computed. linear = interpolate between ranks (numpy default); lower = sorted[floor(q*(n-1))]; nearest_rank = sorted[ceil(q*n)-1]."
+        },
+        "synchronization": {
+          "enum": [
+            "cuda_synchronize",
+            "mps_synchronize",
+            "not_required_cpu",
+            "disabled"
+          ],
+          "description": "Device synchronization used around each timed call."
+        }
+      }
+    },
+    "timing_samples_ms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nonNegativeNumber"
+      },
+      "description": "Individual per-repeat latencies, in ms."
+    },
+    "timing_samples_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path/URI of a stored artifact holding the samples."
     },
     "peak_memory_bytes": {
       "type": [
         "integer",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "description": "null when peak memory could not be measured."
+    },
+    "memory_method": {
+      "enum": [
+        "cuda_max_memory_allocated",
+        "process_peak_rss",
+        "not_measured"
+      ],
+      "description": "Must be 'not_measured' exactly when peak_memory_bytes is null."
     },
     "conversion_overhead_ms": {
       "type": [
         "number",
         "null"
       ],
-      "minimum": 0
+      "minimum": 0,
+      "description": "Precision-conversion cost, null when not applicable."
+    },
+    "conversion_overhead_included_in_latency": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Whether conversion_overhead_ms is already inside p50/p95; null if n/a."
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python_version",
+        "torch_version",
+        "os_platform",
+        "device_metadata",
+        "git_commit"
+      ],
+      "properties": {
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "torch_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "os_platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "device_metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "name"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "cpu",
+                "cuda",
+                "mps"
+              ]
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "properties": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": true,
+              "description": "Free-form device details (deliberate extension point)."
+            }
+          }
+        },
+        "git_commit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{7,40}$"
+        },
+        "git_dirty": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "environment_report_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Path to the environment_report.json for this run."
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Deliberate extension point for fields not yet in the contract."
     },
     "notes": {
       "type": "string"
+    }
+  },
+  "anyOf": [
+    {
+      "required": [
+        "timing_samples_ms"
+      ]
+    },
+    {
+      "required": [
+        "timing_samples_ref"
+      ]
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "peak_memory_bytes": {
+            "type": "null"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "memory_method": {
+            "const": "not_measured"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "memory_method": {
+            "not": {
+              "const": "not_measured"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "preprocessing_once"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backend": {
+            "const": "none"
+          },
+          "workload": {
+            "properties": {
+              "input_boundary": {
+                "const": "raw_media"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "enum": [
+              "operator",
+              "cached_feature_model"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "workload": {
+            "properties": {
+              "input_boundary": {
+                "enum": [
+                  "synthetic_tensors",
+                  "cached_encoder_tokens"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "operator"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backend": {
+            "not": {
+              "const": "none"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "device": {
+            "pattern": "^cpu$"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "environment": {
+            "properties": {
+              "device_metadata": {
+                "properties": {
+                  "type": {
+                    "const": "cpu"
+                  }
+                }
+              }
+            }
+          },
+          "measurement": {
+            "properties": {
+              "synchronization": {
+                "enum": [
+                  "not_required_cpu",
+                  "disabled"
+                ]
+              }
+            }
+          },
+          "memory_method": {
+            "not": {
+              "const": "cuda_max_memory_allocated"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "device": {
+            "pattern": "^cuda"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "environment": {
+            "properties": {
+              "device_metadata": {
+                "properties": {
+                  "type": {
+                    "const": "cuda"
+                  }
+                }
+              }
+            }
+          },
+          "measurement": {
+            "properties": {
+              "synchronization": {
+                "enum": [
+                  "cuda_synchronize",
+                  "disabled"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "device": {
+            "pattern": "^mps$"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "environment": {
+            "properties": {
+              "device_metadata": {
+                "properties": {
+                  "type": {
+                    "const": "mps"
+                  }
+                }
+              }
+            }
+          },
+          "measurement": {
+            "properties": {
+              "synchronization": {
+                "enum": [
+                  "mps_synchronize",
+                  "disabled"
+                ]
+              }
+            }
+          },
+          "memory_method": {
+            "not": {
+              "const": "cuda_max_memory_allocated"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tensorShape": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
     }
   }
 }
