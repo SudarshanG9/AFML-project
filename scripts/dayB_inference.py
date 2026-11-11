@@ -92,12 +92,36 @@ def load_features(path: Path):
 
 
 def create_adapter(args):
-    return DiMoDifAdapter(
+    adapter = DiMoDifAdapter(
         upstream_root=args.upstream,
         checkpoint_name="lavdf",
         device=args.device,
     )
 
+    expected_sha = (
+        "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e"
+    )
+
+    if adapter.checkpoint_sha256 != expected_sha:
+        raise RuntimeError(
+            "Checkpoint mismatch. Refusing to run "
+            "a precision experiment on unapproved weights."
+        )
+
+    if adapter.model.training:
+        raise RuntimeError(
+            "Pretrained detector must be in eval mode."
+        )
+
+    if any(
+        p.requires_grad
+        for p in adapter.model.parameters()
+    ):
+        raise RuntimeError(
+            "Pretrained parameters must remain frozen."
+        )
+
+    return adapter
 
 @torch.inference_mode()
 def run_pilot(adapter, args):
@@ -347,7 +371,11 @@ def main():
     parser.add_argument("--run-id")
 
     args = parser.parse_args()
-
+    if args.manifest and Path(args.out).exists():
+        raise FileExistsError(
+            f"Prediction output already exists: {args.out}. "
+            "Use a new output name for a new run."
+        )
     if args.manifest and not args.out:
         parser.error(
             "--out is required for manifest inference"
@@ -370,3 +398,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

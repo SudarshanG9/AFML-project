@@ -26,3 +26,43 @@ def test_four_paths_return_valid_output():
     for mode in PRECISION_MODES:
         output = fusion_attention(q,k,v,mode=mode)
         assert output.shape == (1,2,3,8) and torch.isfinite(output).all()
+
+
+def test_manual_low_precision_attention():
+    import torch
+
+    from avfuse.member1_fusion.precision import (
+        fake_quant_int8,
+    )
+    from avfuse.member1_fusion.attention import (
+        fusion_attention,
+        sdpa_attention,
+    )
+
+    torch.manual_seed(123)
+
+    q = torch.randn(1, 2, 7, 8)
+    k = torch.randn(1, 2, 7, 8)
+    v = torch.randn(1, 2, 7, 8)
+
+    # Independent construction of the mathematical
+    # definition of the low-precision experiment.
+    q_hat = fake_quant_int8(q)
+    k_hat = fake_quant_int8(k)
+    v_hat = fake_quant_int8(v)
+
+    raw = sdpa_attention(q_hat, k_hat, v_hat)
+    expected = fake_quant_int8(raw)
+
+    actual = fusion_attention(
+        q, k, v,
+        mode="low_precision",
+        backend="sdpa",
+    )
+
+    torch.testing.assert_close(
+        actual,
+        expected,
+        atol=0,
+        rtol=0,
+    )
