@@ -201,6 +201,7 @@ def run_pilot(adapter, args):
                 adapter.checkpoint_sha256,
             "original_score": original_score,
             "modified_score": modified_score,
+            "score_delta": modified_score - original_score,
             "valid_length":
                 intervention["valid_length"],
             "trace": trace,
@@ -371,16 +372,16 @@ def main():
     parser.add_argument("--run-id")
 
     args = parser.parse_args()
-    if args.manifest and Path(args.out).exists():
-        raise FileExistsError(
-            f"Prediction output already exists: {args.out}. "
-            "Use a new output name for a new run."
-        )
     if args.manifest and not args.out:
         parser.error(
             "--out is required for manifest inference"
         )
 
+    if args.manifest and Path(args.out).exists():
+        raise FileExistsError(
+            f"Prediction output already exists: {args.out}. "
+            "Use a new output name for a new run."
+        )
     if args.manifest and args.trace_out:
         parser.error(
             "Use --trace-out only for pilot inference"
