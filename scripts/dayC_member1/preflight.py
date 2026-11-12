@@ -314,12 +314,49 @@ def _new_report_path(root: Path, requested: Path) -> Path:
     return output
 
 
+def build_day9_report(root,*,proposal_path=None,preparation_authorization=None):
+    """Metadata/validation only. Missing research/owner inputs are reported together."""
+    from avfuse.member1_fusion.dayc_freeze import check_preparation_authorization,prior_test_artifacts,verify_registry
+    report={'phase':'day9','status':'BLOCKED','blockers':[],'test_rows_read':False,'test_features_read':False,
+            'freeze_written':False,'policy_selected':False,'checks':{}}
+    try:
+        context_path=root/'configs/dayC/member1/C8A_context.json';context=read_strict_json(context_path)
+        if preparation_authorization:
+            auth=read_strict_json(ensure_inside_repo(root,preparation_authorization,must_exist=True))
+            check_preparation_authorization(auth,sha256_file(context_path));report['source_preparation_authorized']=True
+        validation_item=context['experiment_spec']['local_inputs']['validation_manifest']
+        path=ensure_inside_repo(root,validation_item['path'],must_exist=True);require_sha256(path,validation_item['sha256'])
+        validation=_read_val_manifest(path);ids={r['clip_id'] for r in validation}
+        for mode in MODES:
+            prediction=ensure_inside_repo(root,Path('artifacts/predictions')/(mode+'_val.jsonl'),must_exist=True)
+            report['checks'][mode]=_check_predictions(prediction,mode,ids,CHECKPOINT)
+        report['prior_test_outputs_or_attempts']=prior_test_artifacts(root)
+        if report['prior_test_outputs_or_attempts']:report['blockers'].append('Existing held-out attempt or predictions require lead incident review')
+        if proposal_path:
+            proposal=read_strict_json(ensure_inside_repo(root,proposal_path,must_exist=True))
+            report['blockers']+=proposal.get('blockers',[])
+            verify_registry(root,proposal.get('evidence_hashes',{}),complete=False)
+            if proposal.get('ready_for_freeze') is not True:report['blockers'].append('Proposal is not scientifically freeze-ready')
+        else:
+            report['blockers']+=['Actual B2 statistics/research proposal pending',
+                'WAITING FOR MEMBER 2 final threshold/test-seal release',
+                'WAITING FOR MEMBER 3 benchmark/runtime release','Lead C9 proposal-bound freeze approval absent']
+        report['source_preparation_status']='IMPLEMENTED; joint B2/B3 review pending'
+    except (OSError,ValueError,KeyError) as exc:
+        report['blockers'].append(f'{type(exc).__name__}: {exc}')
+    report['blockers']=list(dict.fromkeys(report['blockers']))
+    report['status']='BLOCKED' if report['blockers'] else 'READY_FOR_C9_REVIEW'
+    return report
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--phase", choices=("baseline", "day8", "day9", "day10-readonly"), required=True)
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--spec", type=Path, default=Path("configs/dayC/member1/experiment_spec.json"))
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument('--proposal',type=Path)
+    parser.add_argument('--preparation-authorization',type=Path)
     args = parser.parse_args(argv)
     if not args.repo_root.is_absolute():
         parser.error("--repo-root must be absolute")
@@ -327,7 +364,13 @@ def main(argv=None) -> int:
     if Path(__file__).resolve().parents[2] != root:
         raise PermissionError("Run the preflight belonging to the specified repository")
     output = _new_report_path(root, args.out)
-    report = build_baseline_report(root, args.spec, phase=args.phase)
+    if args.phase=='day9':
+        report=build_day9_report(root,proposal_path=args.proposal,preparation_authorization=args.preparation_authorization)
+    elif args.phase=='day10-readonly':
+        report={'phase':'day10-readonly','status':'BLOCKED','blockers':['Use verify_day10_release --dry-run with actual frozen identities after C9'],
+                'test_rows_read':False,'test_features_read':False,'attempt_created':False}
+    else:
+        report = build_baseline_report(root, args.spec, phase=args.phase)
     if not output.parent.is_dir():
         output.parent.mkdir(parents=True, exist_ok=True)
     digest = write_new_json(output, report)
