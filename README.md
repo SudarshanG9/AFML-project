@@ -2,11 +2,11 @@
 
 **IO-Aware, Precision-Controlled Audio-Visual Fusion for Deepfake Detection**
 
-> **Status:** repository scaffold and unit-testable research primitives, **NOT** a trained or validated deepfake detector. Before interpreting results, select a real checkpoint, verify its cross-modal fusion boundary, obtain licensed labeled clips, and complete end-to-end integration.
+> **Status:** pretrained DiMoDif integration and validation-only Day B experiments are implemented. Reference, low-precision and V/output-restored configurations each have 1,200 locally audited predictions. The evidence establishes no positive quantization damage or restoration rescue; final scientific sign-off is pending. Query-control, policy freeze and held-out evaluation remain later work. See [Day B results and limitations](docs/dayB/RESULTS.md).
 
 ## Research question
 
-Under source-disjoint, manipulation-stratified evaluation, does simulated INT8-style precision reduction inside a joint audio-visual detector's cross-modal attention change forensic correctness by attack type (audio-fake, video-fake, both-fake)? Can selective value/output-path restoration recover more loss than a query-path restoration control relative to *measured* added cost?
+Under source-disjoint, manipulation-stratified evaluation, does simulated INT8-style precision reduction inside a joint audio-visual detector's self-attention change forensic correctness by attack type (audio-fake, video-fake, both-fake)? Can selective value/output-path restoration recover more loss than a query-path restoration control relative to *measured* added cost?
 
 ## Three member-owned components
 
@@ -18,30 +18,30 @@ Under source-disjoint, manipulation-stratified evaluation, does simulated INT8-s
 
 Shared schemas are in `contracts/schemas/`; reference decisions and integration gates are in `docs/`.
 
-## Install and run the scaffold
+## Install and run tests
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate           # on Windows: .venv\Scripts\activate
 python -m pip install -e '.[dev]'
 python scripts/check_environment.py
-pytest -q
+python -m pytest -q
 python -m avfuse.member3_runtime.cli --smoke
 ```
 
 The **smoke CLI intentionally uses synthetic tensors and a randomly initialized toy fusion head**. Its fake-score outputs are not scientific results. It only confirms module wiring.
 
-## Research outputs (planned; not yet generated)
+## Local research outputs
 
 ```text
-data/cache/<clip_id>.pt          # encoder tokens or an explicitly documented feature boundary
+<cache-root>/val/<clip_id>/features.npz  # private cached encoder features, with meta.json
 artifacts/predictions/*.jsonl   # one line per clip per configuration
 artifacts/benchmarks/*.jsonl    # one line per configuration/device/scope
 artifacts/reports/              # validation/test statistics and intervals
 artifacts/runs/                 # frozen run config + hashes + software/device info
 ```
 
-Data, personally sensitive clips, model weights and generated results are excluded from git by default. See `data/README.md`.
+Data, model weights and generated results are excluded from Git by default. Source, tests, protocol/config metadata and the summarized results stay in this repository. See [GitHub file layout](docs/dayB/GITHUB_FILES.md), [Day B reproduction](docs/dayB/README.md) and `data/README.md`.
 
 ## Ground rules
 
