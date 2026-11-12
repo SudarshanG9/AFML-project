@@ -174,7 +174,9 @@ def reference_parity_on_validation_feature(adapter, features) -> dict:
                 raise RuntimeError("Original attention methods were not restored")
             if set(features) != set(snapshots) or any(not torch.equal(features[k], v) for k, v in snapshots.items()):
                 raise RuntimeError("Input feature tensors changed during parity audit")
-        return {"status": "PASS", "logits_atol": 1e-5, "logits_rtol": 1e-4,
+        return {"status": "PASS", "original_fake_scores": original["score_fake"].reshape(-1).tolist(),
+                "instrumented_fake_scores": instrumented["score_fake"].reshape(-1).tolist(),
+                "logits_atol": 1e-5, "logits_rtol": 1e-4,
                 "score_atol": 1e-6, "score_rtol": 1e-5, "trace": trace_audit,
                 "state_unchanged": True, "inputs_unchanged": True,
                 "method_cleanup_success_and_exception": True,

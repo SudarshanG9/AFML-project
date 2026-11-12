@@ -228,3 +228,121 @@ def test_model_invariants_fail_closed(fixture_adapter, defect):
         return
     with pytest.raises(ValueError):
         audit.check_model_invariants(adapter, checkpoint_sha256=adapter.checkpoint_sha256)
+
+
+
+from scripts.dayC_member1 import query_audit
+
+
+def test_pilot_missing_c0_stops_before_features(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("feature/model access before C0")
+    monkeypatch.setattr(query_audit.preflight, "_read_val_manifest", forbidden)
+    report = query_audit.pilot_entry(tmp_path, Path("absent.json"), Path("model"), Path("test/features.npz"))
+    assert report["status"] == "BLOCKED"
+    assert "C0 acknowledgement" in report["blockers"][0]
+    assert not report["feature_contents_read"]
+
+
+@pytest.mark.parametrize("release", [{"status": "BLOCKED"}, {"status": "READY", "split": "test"}])
+def test_pilot_executor_denies_unreleased_or_test_input(tmp_path, release, monkeypatch):
+    from scripts import dayB_inference
+    def forbidden(*args, **kwargs):
+        pytest.fail("model constructed before release")
+    monkeypatch.setattr(dayB_inference, "create_adapter", forbidden)
+    with pytest.raises(PermissionError):
+        query_audit._run_pilot(tmp_path, tmp_path, release)
+
+
+def synthetic_pilot_release(tmp_path):
+    path = tmp_path / "TEST_FIXTURE_features.npz"
+    path.write_bytes(b"synthetic fixture bytes, not an encoder cache")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    return {"status": "READY", "split": "val", "clip_id": "TEST_FIXTURE",
+            "input_paths": {"fixture": path.name}, "input_hashes": {"fixture": digest},
+            "feature_path": path.name, "feature_sha256": digest}
+
+
+@torch.inference_mode()
+def test_pilot_synthetic_execution_reuses_adapter_and_tensors(fixture_adapter, tmp_path, monkeypatch):
+    from scripts import dayB_inference
+    adapter, features = fixture_adapter
+    calls = []
+    def create(args):
+        calls.append("create")
+        return adapter
+    def load(path):
+        calls.append("load")
+        return features
+    monkeypatch.setattr(dayB_inference, "create_adapter", create)
+    monkeypatch.setattr(dayB_inference, "load_features", load)
+    monkeypatch.setattr(query_audit.preflight, "CHECKPOINT", adapter.checkpoint_sha256)
+    report = query_audit._run_pilot(tmp_path, tmp_path, synthetic_pilot_release(tmp_path))
+    assert calls == ["create", "load"]
+    assert report["status"] == "PILOT_COMPLETE_PENDING_C8A"
+    assert set(report["modes"]) == {"low_precision", "restore_value_output", "restore_query"}
+    assert all(len(value["trace"]) == 20 for value in report["modes"].values())
+    assert report["state_and_inputs_unchanged"]
+
+
+@torch.inference_mode()
+@pytest.mark.parametrize("defect", ["nonfinite_score", "input_mutation", "model_mutation"])
+def test_synthetic_pilot_failures_never_claim_completion(fixture_adapter, tmp_path, monkeypatch, defect):
+    from scripts import dayB_inference
+    adapter, features = fixture_adapter
+    original = adapter.forward_with_mode
+    def altered(features, mode, trace):
+        result = original(features, mode, trace)
+        if mode == "restore_query":
+            if defect == "nonfinite_score":result["score_fake"] = torch.tensor([float("nan")])
+            elif defect == "input_mutation":features["tokens"].add_(1)
+            else:next(adapter.model.parameters()).add_(1)
+        return result
+    monkeypatch.setattr(adapter, "forward_with_mode", altered)
+    monkeypatch.setattr(dayB_inference, "create_adapter", lambda args: adapter)
+    monkeypatch.setattr(dayB_inference, "load_features", lambda path: features)
+    monkeypatch.setattr(query_audit.preflight, "CHECKPOINT", adapter.checkpoint_sha256)
+    with pytest.raises((ValueError, RuntimeError)):
+        query_audit._run_pilot(tmp_path, tmp_path, synthetic_pilot_release(tmp_path))
+
+
+def test_pilot_cache_or_runtime_block_precedes_requested_feature(tmp_path, monkeypatch):
+    # Isolated metadata-gate ordering test. No real assets, C0 ACK or bypass CLI.
+    fake = tmp_path / "fixture"
+    fake.write_text("TEST_FIXTURE")
+    monkeypatch.setattr(query_audit, "_c0_release", lambda root: {"TEST_FIXTURE": True})
+    monkeypatch.setattr(query_audit, "require_frozen_inputs", lambda *args: None)
+    monkeypatch.setattr(query_audit, "require_sha256", lambda *args: None)
+    spec = {"local_inputs": {name: {"path": "fixture", "sha256": "0" * 64} for name in
+           ["checkpoint", "upstream_source", "validation_manifest", "ready_val_manifest",
+            "environment_reference", "predictions_reference", "predictions_low_precision", "predictions_restore_value_output"]},
+            "expected_baseline": {"branch": "member1"}}
+    keys = ("python", "platform", "versions", "torch_threads", "torch_interop_threads", "cuda_available")
+    accepted = dict.fromkeys(keys, "accepted")
+    monkeypatch.setattr(query_audit, "read_strict_json", lambda path:
+                        {"reference_environment": accepted} if path == fake else spec)
+    source = tmp_path / "model/src/models.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("# TEST_FIXTURE")
+    spec["local_inputs"]["upstream_source"]["path"] = "model/src/models.py"
+    spec_path = tmp_path / "spec.json"
+    spec_path.write_text("TEST_FIXTURE")
+    monkeypatch.setattr(query_audit.preflight, "_git", lambda root, *args: "member1")
+    monkeypatch.setattr(query_audit.preflight, "_read_val_manifest", lambda path: [])
+    monkeypatch.setattr(query_audit.preflight, "_reconcile_val_manifests", lambda *args: set())
+    monkeypatch.setattr(query_audit.preflight, "_check_predictions", lambda *args: {})
+    monkeypatch.setattr(query_audit.preflight, "_check_feature_paths", lambda *args:
+                        {"existing_local_paths": 0, "unresolved_paths": ["TEST_FIXTURE"]})
+    monkeypatch.setattr(query_audit.preflight, "_environment", lambda: dict.fromkeys(keys, "local"))
+    requested = tmp_path / "DO_NOT_OPEN_test_feature.npz"
+    real_inside = query_audit.ensure_inside_repo
+    def guarded_inside(root, path, **kwargs):
+        if path == requested:
+            pytest.fail("requested feature resolved before cohort/runtime readiness")
+        return real_inside(root, path, **kwargs)
+    monkeypatch.setattr(query_audit, "ensure_inside_repo", guarded_inside)
+    report = query_audit.pilot_entry(tmp_path, spec_path, tmp_path / "model", requested)
+    assert len(report["blockers"]) == 2
+    assert report["runtime_differences"]
+    assert report["status"] == "BLOCKED"
+    assert not report["feature_contents_read"]
