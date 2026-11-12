@@ -1,0 +1,161 @@
+{
+  "attention_architecture": "DiMoDif five-layer joint AV self-attention",
+  "attention_backend": "sdpa",
+  "batch_size": 1,
+  "bootstrap_replicates": 1000,
+  "bootstrap_seed": 0,
+  "checkpoint_sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e",
+  "expected_baseline": {
+    "branch": "member1",
+    "head": "4af1615c10cd35f34081f99be42f1913e0727ea6"
+  },
+  "heldout_inputs": "not inspected or configured before the appropriate research gate",
+  "local_inputs": {
+    "calibration": {
+      "path": "artifacts/reports/dayB_validation_calibration.json",
+      "sha256": "358c037242f6980fed2a8d0ff0ef830f17b4789676b391c8f6dff245842b37dd",
+      "verified_scope": "file_bytes"
+    },
+    "canonical_manifest": {
+      "path": "data/manifests/manifest_whole.jsonl",
+      "sha256": "8339b2476a71e62c6c6fca7d937ba4cc7a704b09d26f08506c20d1f10de8f3dd",
+      "verified_scope": "file_bytes"
+    },
+    "checkpoint": {
+      "path": "third_party/dimodif/ckpt/dfd/dfd_lavdf_reduceonplateau_64_4_1_5_True.pth",
+      "sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e",
+      "verified_scope": "file_bytes"
+    },
+    "dayb_audit": {
+      "path": "artifacts/dayB/final_review/DayB_FINAL_CPU_20261112T031627Z_91e5f723/DAYB_FINAL_AUDIT.json",
+      "sha256": "7a55e3c62d957d4eae3f0df67e58668fde89fe8536342fd561495bd73b94cd68",
+      "verified_scope": "file_bytes"
+    },
+    "dayb_context": {
+      "path": "artifacts/dayB/final_review/DayB_FINAL_CPU_20261112T031627Z_91e5f723/received_evidence/provenance/g5/execution_context.json",
+      "sha256": "c03488cb787b1230bd86274dc7a36d39983574c7e2bc996c931dcfc8a835bd7c",
+      "verified_scope": "file_bytes"
+    },
+    "environment_reference": {
+      "path": "configs/dayB/environment.reference.json",
+      "sha256": "460b0786144d2e3d9f70e1f1e9e2ae0d988ff2bfe88a34e36375c6057432b18f",
+      "verified_scope": "file_bytes"
+    },
+    "model_config": {
+      "path": "third_party/dimodif/ckpt/dfd/dfd_lavdf_reduceonplateau_64_4_1_5_True.json",
+      "sha256": "bea128dc7dad6b72bc0487dcc45d03ae3322e48fd597de1a5cd83ad036f30651",
+      "verified_scope": "file_bytes"
+    },
+    "precision_modes": {
+      "path": "configs/dayB/precision_modes.json",
+      "sha256": "8c2be706b0998ccbf9f9198da2e8d1dcbeffff289937308cfd6a5f4ce7363a23",
+      "verified_scope": "file_bytes"
+    },
+    "predictions_low_precision": {
+      "path": "artifacts/predictions/low_precision_val.jsonl",
+      "sha256": "79bb4e462254beba2812bbf2ce56ad2f8cbe3c15fa128a3db5542d843978c636",
+      "verified_scope": "file_bytes"
+    },
+    "predictions_reference": {
+      "path": "artifacts/predictions/reference_val.jsonl",
+      "sha256": "e146432023638635b53dc517f3b4b06ecd87a6599efe3709ed14b145c7458ff3",
+      "verified_scope": "file_bytes"
+    },
+    "predictions_restore_value_output": {
+      "path": "artifacts/predictions/restore_value_output_val.jsonl",
+      "sha256": "2deb811328045c1ca0f04ea87db9c693fb776d84079e375ae6c42dee456441ea",
+      "verified_scope": "file_bytes"
+    },
+    "ready_val_manifest": {
+      "path": "artifacts/dayB/final_review/DayB_FINAL_CPU_20261112T031627Z_91e5f723/received_evidence/provenance/g4/dayB_val_ready.jsonl",
+      "sha256": "c79ad908517878ebf0f3aa0e0dac053a01d9d5c4eb264583db26096985890481",
+      "verified_scope": "file_bytes"
+    },
+    "source_attention": {
+      "path": "src/avfuse/member1_fusion/attention.py",
+      "sha256": "8ef4f1f85c48963d65dc99ec415ab34a170d493fe51336635d221c396fee8578",
+      "verified_scope": "file_bytes"
+    },
+    "source_dayB_inference": {
+      "path": "scripts/dayB_inference.py",
+      "sha256": "a0fd7257206bcc7c7c3b08c45684fb1ddba287d6ad018cdc4bfe4819c403399a",
+      "verified_scope": "file_bytes"
+    },
+    "source_dayB_model_benchmark": {
+      "path": "scripts/dayB_model_benchmark.py",
+      "sha256": "5dc20853e976ceadb2f3020ab4782eac371c48f183d6a43afb1520f917d4781c",
+      "verified_scope": "file_bytes"
+    },
+    "source_dimodif_adapter": {
+      "path": "src/avfuse/member1_fusion/dimodif_adapter.py",
+      "sha256": "256e5620a00f8c4cb846c30100d1870d2c4c9db5c59f7f6a0d1d25eb8a130ae0",
+      "verified_scope": "file_bytes"
+    },
+    "source_dimodif_intervention": {
+      "path": "src/avfuse/member1_fusion/dimodif_intervention.py",
+      "sha256": "3a0fe003ca3081884f5b38b362145df43a8d3cd3cdd9bee4a0db05e69bb131cf",
+      "verified_scope": "file_bytes"
+    },
+    "source_precision": {
+      "path": "src/avfuse/member1_fusion/precision.py",
+      "sha256": "a0e54283deb806e5541b80f162354c22ed85f48582917e603eed10690a997cd9",
+      "verified_scope": "file_bytes"
+    },
+    "upstream_source": {
+      "path": "third_party/dimodif/src/models.py",
+      "sha256": "e74b5e3b5fcee24353f9940dddd48d9ac1982ced725664db2518f63a6d853778",
+      "verified_scope": "file_bytes"
+    },
+    "validation_manifest": {
+      "path": "data/manifests/manifest_whole_val.jsonl",
+      "sha256": "22d1d9e02403cfdbb05f2116da16bc4015f540547a4ac00bf6b7127c119e359c",
+      "verified_scope": "file_bytes"
+    }
+  },
+  "modes_ordered": [
+    "reference",
+    "low_precision",
+    "restore_value_output",
+    "restore_query"
+  ],
+  "note": "This file defines experiments; it does NOT grant approval or freeze a result.",
+  "original_days": [
+    8,
+    9,
+    10
+  ],
+  "ownership": "member1_only",
+  "precision": "symmetric_dynamic_per_tensor_fake_INT8_in_floating_point",
+  "prediction_score": "probability_of_fake_from_original_DiMoDif_head",
+  "primary_checkpoint": "lavdf",
+  "project": "AVFuse-CausalQ",
+  "quantized_boundaries": [
+    "Q",
+    "K",
+    "V",
+    "attention_output"
+  ],
+  "ready_val_status": "historical_approved_manifest_with_Colab_paths; local cache readiness is not asserted",
+  "restore_query": {
+    "K": "fake_INT8",
+    "Q": "FP32",
+    "V": "fake_INT8",
+    "attention_output": "fake_INT8"
+  },
+  "restore_value_output": {
+    "K": "fake_INT8",
+    "Q": "fake_INT8",
+    "V": "FP32",
+    "attention_output": "FP32"
+  },
+  "schema_id": "avfuse-member1-dayc-spec/1.0",
+  "score_threshold_source": "member2_validation_calibration_only",
+  "test_policy": "exactly_one_unmodified_full_four_mode_run_after_human_freeze",
+  "validation_expected_by_type": {
+    "audio_fake": 300,
+    "both_fake": 300,
+    "real": 300,
+    "video_fake": 300
+  },
+  "validation_expected_total": 1200
+}
