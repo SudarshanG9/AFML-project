@@ -1,0 +1,29 @@
+{
+  "semantics": "symmetric dynamic per-tensor fake INT8; floating tensors, no integer kernels",
+  "layers": "all five joint AV self-attention layers; surrounding model weights/projections/head remain FP32",
+  "reference": {
+    "Q": "FP32",
+    "K": "FP32",
+    "V": "FP32",
+    "attention_output": "FP32"
+  },
+  "low_precision": {
+    "Q": "fake_INT8",
+    "K": "fake_INT8",
+    "V": "fake_INT8",
+    "attention_output": "fake_INT8"
+  },
+  "restore_value_output": {
+    "Q": "fake_INT8",
+    "K": "fake_INT8",
+    "V": "FP32",
+    "attention_output": "FP32"
+  },
+  "restore_query": {
+    "Q": "FP32",
+    "K": "fake_INT8",
+    "V": "fake_INT8",
+    "attention_output": "fake_INT8",
+    "status": "Day8; not evaluated in DayB"
+  }
+}
