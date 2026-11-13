@@ -10,6 +10,7 @@ from avfuse.member1_fusion.dayc_guards import (
 from avfuse.member1_fusion.dayc_freeze import (
     CHECKPOINT,PURPOSE,require,verify_release,verify_registry)
 from avfuse.member1_fusion.dayc_validation import MODES
+from avfuse.member1_fusion.dayc_test_contract import resolve_mapped_test_feature,inspect_cache_identity
 
 
 def safe_run_id(value):
@@ -55,7 +56,25 @@ def reconcile_test_metadata(canonical,ready,expected_count):
     return sorted(ready,key=lambda r:r['clip_id'])
 
 
-def resolve_test_feature(root,row):
+def read_frozen_cohort(root,frozen):
+    # Only reached after C10/claim (or authorized saved-output audit).
+    from avfuse.member2_data.manifest import read_manifest
+    registry=frozen['inputs'];canonical=read_manifest(Path(root)/registry['canonical_manifest']['path'])
+    contract=frozen.get('heldout_cohort',{'kind':'ready_manifest'})
+    if contract['kind']=='canonical_split':
+        require(registry['ready_test_manifest']==registry['canonical_manifest'],'Canonical selector redirected')
+        require(contract['split']=='test' and contract['expected_count']==frozen['expected_count'] and
+            contract['manifest_sha256']==registry['canonical_manifest']['sha256'],'Canonical selector identity differs')
+        ready=[r for r in canonical if r['split']=='test']
+    else:
+        require(contract['kind']=='ready_manifest','Unknown cohort selector')
+        ready=read_manifest(Path(root)/registry['ready_test_manifest']['path'])
+    return reconcile_test_metadata(canonical,ready,frozen['expected_count'])
+
+
+def resolve_test_feature(root,row,policy=None):
+    if policy is not None and policy.get('kind')=='split_clip_cache':
+        return resolve_mapped_test_feature(row,policy)
     require(row['split']=='test','Non-test row in held-out runner')
     require(isinstance(row['clip_id'],str) and re.fullmatch('[A-Za-z0-9_-]+',row['clip_id']),'Unsafe clip identity')
     requested=Path(row['feature_path']);raw=requested if requested.is_absolute() else Path(root)/requested
@@ -146,10 +165,18 @@ def execute_heldout(args):
         with (out/'command.log').open('x') as stream:stream.write(json.dumps({'purpose':PURPOSE,'run_id':run_id,'modes':list(MODES)})+'\n')
         write_new_json(out/'attempt_opened.json',event)
         write_new_json(out/'release_check.json',{k:v for k,v in release.items() if k not in ('policy','run')})
-        from avfuse.member2_data.manifest import read_manifest
-        canonical=read_manifest(args.canonical_manifest);ready=read_manifest(args.ready_test_manifest)
-        rows=reconcile_test_metadata(canonical,ready,frozen['expected_count'])
-        for row in rows:resolve_test_feature(root,row)
+        rows=read_frozen_cohort(root,frozen)
+        path_policy=frozen.get('feature_path_policy',{'kind':'project_local_only'})
+        resolve=lambda row:resolve_test_feature(root,row,path_policy)
+        acquired={}
+        for row in rows:
+            path=resolve(row)
+            if path_policy['kind']=='split_clip_cache':acquired[row['clip_id']]=inspect_cache_identity(row,path)
+        # Complete float32/shape/finite checks precede any model call. This integrity
+        # pass is separate from the one load per clip in the scoring engine.
+        if acquired:write_new_json(out/'cache_acquisition_preflight.json',{'status':'PASS','count':len(acquired),
+            'identity_basis':'owner cohort plus C10-time full-array/metadata checks; original per-file hashes unavailable',
+            'records':list(acquired.values())})
         verify_registry(root,registry)
         import torch
         torch.manual_seed(42)
@@ -168,7 +195,18 @@ def execute_heldout(args):
         def progress(index,completed):
             counts.update(completed)
             with (out/'progress.log').open('a') as stream:stream.write(json.dumps({'current_clip_index':index,'mode_counts':completed})+'\n')
-        outputs,identities=score_complete_cohort(rows,adapter,load_features,lambda row:resolve_test_feature(root,row),run_id,progress)
+        def checked_resolve(row):
+            path=resolve(row)
+            if acquired:
+                item=acquired[row['clip_id']];require_sha256(path,item['feature_sha256'])
+                require_sha256(path.parent/'meta.json',item['metadata_sha256'])
+            return path
+        outputs,identities=score_complete_cohort(rows,adapter,load_features,checked_resolve,run_id,progress)
+        if acquired:
+            for row in rows:checked_resolve(row)
+            for item in identities:
+                require(item['feature_sha256']==acquired[item['clip_id']]['feature_sha256'],'Cache changed since preflight')
+                item.update(acquired[item['clip_id']])
         after=check_model_invariants(adapter,checkpoint_sha256=CHECKPOINT)
         require(before['state_dict_sha256']==after['state_dict_sha256'],'Frozen model state changed')
         verify_registry(root,registry)
@@ -219,17 +257,20 @@ def audit_saved_outputs(root,run_dir,frozen_policy,frozen_run,freeze_anchor,appr
     require(entries[1]['mode_counts']==dict.fromkeys(MODES,frozen['expected_count']),'Incomplete ledger counts')
     require(not (run_dir/'attempt_failed.json').exists(),'Failed attempt cannot be called complete')
     require(read_strict_json(run_dir/'attempt_completed.json')['status']=='COMPLETE','Missing completion marker')
-    from avfuse.member2_data.manifest import read_manifest
     from avfuse.member2_data.predictions import read_predictions
     registry=frozen['inputs']
-    ready=reconcile_test_metadata(read_manifest(root/registry['canonical_manifest']['path']),
-        read_manifest(root/registry['ready_test_manifest']['path']),frozen['expected_count'])
+    ready=read_frozen_cohort(root,frozen)
     ids={r['clip_id'] for r in ready};preds=run_dir/'predictions'
     require({p.name for p in preds.iterdir()}=={m+'_test.jsonl' for m in MODES},'Prediction file set differs')
     cached=read_strict_json(run_dir/'provenance/manifest_and_cache_identity.json')['features']
     require(len(cached)==len(ids) and {r['clip_id'] for r in cached}==ids,'Cached identity inventory differs')
     expected_cache={r['clip_id']:r['feature_sha256'] for r in cached}
-    for row in ready:require_sha256(resolve_test_feature(root,row),expected_cache[row['clip_id']])
+    for row in ready:
+        path=resolve_test_feature(root,row,frozen.get('feature_path_policy'))
+        require_sha256(path,expected_cache[row['clip_id']])
+        if frozen.get('feature_path_policy',{}).get('kind')=='split_clip_cache':
+            matches=[r for r in cached if r['clip_id']==row['clip_id']]
+            require_sha256(path.parent/'meta.json',matches[0]['metadata_sha256'])
     expected=read_strict_json(run_dir/'provenance/output_hashes.json');hashes={} 
     for mode in MODES:
         path=preds/(mode+'_test.jsonl');rows=read_predictions(path)

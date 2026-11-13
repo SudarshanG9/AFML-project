@@ -8,7 +8,7 @@ from avfuse.member1_fusion.dayc_freeze import (
 
 
 def prepare(root,output,*,registry_path=None,evidence_path=None,member2=None,member3=None,
-            c8b_approval=None,preparation_authorization=None,interpretation=None):
+            c8b_approval=None,preparation_authorization=None,interpretation=None,feature_path_policy=None):
     root=Path(root).resolve(strict=True)
     context_path=root/'configs/dayC/member1/C8A_context.json';context=read_strict_json(context_path)
     evidence_file=ensure_inside_repo(root,evidence_path,must_exist=True) if evidence_path else None
@@ -27,7 +27,7 @@ def prepare(root,output,*,registry_path=None,evidence_path=None,member2=None,mem
     m3=read_strict_json(ensure_inside_repo(root,member3,must_exist=True)) if member3 else None
     expected=expected_owner_context(root,context,registry)
     proposal=build_draft(context=context,registry=registry,evidence_packet=packet,member2_release=m2,
-        member3_release=m3,expected=expected,c8b_accepted=accepted,interpretation=interpretation)
+        member3_release=m3,expected=expected,c8b_accepted=accepted,interpretation=interpretation,feature_path_policy=feature_path_policy)
     output=ensure_inside_repo(root,output);output.relative_to(root/'artifacts/dayC/member1/day9')
     require_new_file(output);output.mkdir(parents=True,exist_ok=False)
     digest=write_new_json(output/'policy_proposal.json',proposal)
@@ -45,7 +45,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--repo-root',type=Path,required=True);p.add_argument('--action',choices=('propose','finalize'),required=True)
     p.add_argument('--out-dir',type=Path,required=True)
-    for name in ('registry','evidence-packet','member2-release','member3-release','c8b-approval','c9-approval','preparation-authorization','proposal'):
+    for name in ('registry','evidence-packet','member2-release','member3-release','c8b-approval','c9-approval','preparation-authorization','proposal','feature-path-policy'):
         p.add_argument('--'+name,type=Path)
     p.add_argument('--interpretation',choices=('reference_preferred','no_restoration_justified','restoration_conditionally_supported','inconclusive'))
     a=p.parse_args();root=a.repo_root.resolve(strict=True)
@@ -53,7 +53,8 @@ def main():
     if a.action=='propose':
         result=prepare(root,a.out_dir,registry_path=a.registry,evidence_path=a.evidence_packet,
             member2=a.member2_release,member3=a.member3_release,c8b_approval=a.c8b_approval,
-            preparation_authorization=a.preparation_authorization,interpretation=a.interpretation)
+            preparation_authorization=a.preparation_authorization,interpretation=a.interpretation,
+            feature_path_policy=read_strict_json(ensure_inside_repo(root,a.feature_path_policy,must_exist=True)) if a.feature_path_policy else None)
         print(result['preparation_state'])
     else:
         if not all((a.proposal,a.c9_approval,a.c8b_approval)):raise PermissionError('Finalization requires actual C8B and proposal-bound C9 records')

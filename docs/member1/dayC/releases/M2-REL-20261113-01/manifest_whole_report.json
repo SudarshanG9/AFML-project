@@ -1,0 +1,30 @@
+{
+  "n_videos": 3200,
+  "counts": {
+    "val": {
+      "both_fake": 300,
+      "video_fake": 300,
+      "audio_fake": 300,
+      "real": 300
+    },
+    "test": {
+      "both_fake": 500,
+      "video_fake": 500,
+      "audio_fake": 500,
+      "real": 500
+    }
+  },
+  "groups_per_split": {
+    "val": 1114,
+    "test": 1738
+  },
+  "split_audit_passed": true,
+  "longer_than_max_frames": 0,
+  "max_frames": 600,
+  "files_checked": true,
+  "duration_s": {
+    "min": 2.944,
+    "median": 7.424,
+    "max": 19.968
+  }
+}

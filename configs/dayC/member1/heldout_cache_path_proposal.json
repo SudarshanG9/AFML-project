@@ -1,0 +1,7 @@
+{
+  "kind": "split_clip_cache",
+  "cache_root": "/content/afml_drive/MyDrive/AFML_Project/dimodif_emb",
+  "split": "test",
+  "feature_filename": "features.npz",
+  "metadata_filename": "meta.json"
+}
