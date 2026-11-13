@@ -35,3 +35,57 @@ def quantize_output(out: Tensor, mode: PrecisionMode) -> Tensor:
     if mode in ("low_precision", "restore_query"):
         return fake_quant_int8(out)
     return out
+
+
+
+
+def quantization_diagnostics(
+    original: Tensor,
+    modified: Tensor,
+) -> dict:
+    """Measure the numerical effect of a precision intervention.
+
+    Diagnostic only. Do not run this during latency benchmarks
+    because reading scalar values can synchronize the GPU.
+    """
+    if original.shape != modified.shape:
+        raise ValueError("Diagnostic tensor shapes do not match")
+
+    if original.dtype != modified.dtype:
+        raise ValueError("Diagnostic tensor dtypes do not match")
+
+    if not torch.isfinite(original).all():
+        raise ValueError("Original tensor contains NaN/Inf")
+
+    if not torch.isfinite(modified).all():
+        raise ValueError("Modified tensor contains NaN/Inf")
+
+    x = original.detach().float()
+    y = modified.detach().float()
+
+    error = (x - y).abs()
+    max_abs = x.abs().amax()
+
+    scale = max_abs.clamp_min(
+        torch.finfo(x.dtype).tiny
+    ) / 127.0
+
+    original_norm = torch.linalg.vector_norm(x)
+    error_norm = torch.linalg.vector_norm(x - y)
+
+    relative_l2 = error_norm / original_norm.clamp_min(
+        torch.finfo(x.dtype).eps
+    )
+
+    return {
+        "shape": list(x.shape),
+        "dtype": str(original.dtype),
+        "max_abs": float(max_abs.item()),
+        "scale": float(scale.item()),
+        "mean_absolute_error": float(error.mean().item()),
+        "max_absolute_error": float(error.max().item()),
+        "relative_l2_error": float(relative_l2.item()),
+        "fraction_changed": float(
+            (x != y).float().mean().item()
+        ),
+    }
