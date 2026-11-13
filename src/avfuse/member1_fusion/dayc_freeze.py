@@ -220,6 +220,22 @@ def build_draft(*,context,registry,evidence_packet=None,member2_release=None,mem
     finite_tree(proposal);return proposal
 
 
+def verify_pilot_source_compatibility(context,registry,checks):
+    """Keep C8A scoring bytes exact; recognize only the recorded diagnostic display repair."""
+    diagnostic='src/avfuse/member3_runtime/cli.py'
+    original='c10bbe905f6d78b57590d2f2d851ec5a33c7bde914d981af661ae81ecb3b92a0'
+    repaired='8bdff2f3604bbf7726b831c0bb6423361570e8520974b65ab10efdf1ed352dde'
+    for path,expected_sha in context['pilot_source_sha256'].items():
+        key='source:'+path
+        if key not in registry:continue
+        observed=registry[key]['sha256']
+        if path==diagnostic and observed!=expected_sha:
+            require(path not in SCORING_FILES and expected_sha==original and observed==repaired
+                and checks.get('additional_source_sha256',{}).get(path)==repaired,
+                'Unapproved diagnostic source change: '+path)
+        else:require(observed==expected_sha,'Approved scoring/source semantics changed: '+path)
+
+
 def validate_complete_proposal(root,proposal,context):
     finite_tree(proposal)
     require(proposal.get('schema_id')=='avfuse-member1-precision-policy/1.0','Wrong policy schema')
@@ -234,9 +250,6 @@ def validate_complete_proposal(root,proposal,context):
     validate_path_policy(proposal.get('feature_path_policy',{'kind':'project_local_only'}))
     require(type(proposal.get('test_score_accesses_for_policy_selection')) is int and proposal.get('test_score_accesses_for_policy_selection')==0,'Test-based policy selection forbidden')
     registry=verify_registry(root,proposal['evidence_hashes'])
-    for path,expected_sha in context['pilot_source_sha256'].items():
-        key='source:'+path
-        if key in registry:require(registry[key]['sha256']==expected_sha,'Approved scoring/source semantics changed: '+path)
     for name in ('checkpoint','model_config','upstream_source','canonical_manifest','validation_manifest',
                  'ready_val_manifest','calibration','precision_modes',*('predictions_'+m for m in MODES[:3])):
         target='model_source' if name=='upstream_source' else name
@@ -255,6 +268,7 @@ def validate_complete_proposal(root,proposal,context):
             'Test report is not bound to actual saved output')
     require(checks.get('source_sha256')=={p:registry['source:'+p]['sha256'] for p in SCORING_FILES},
             'Source changed after the recorded pre-freeze tests')
+    verify_pilot_source_compatibility(context,registry,checks)
     require(not prior_test_artifacts(root),'Prior held-out attempt/predictions already exist')
     expected=expected_owner_context(root,context,registry)
     for owner in ('member2','member3'):

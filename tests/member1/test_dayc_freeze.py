@@ -175,3 +175,19 @@ def test_member3_release_binds_protocol_and_actual_timings(defect):
     if defect is None:f.validate_owner_release(record,'member3',expected)
     else:
         with pytest.raises(ValueError):f.validate_owner_release(record,'member3',expected)
+
+
+@pytest.mark.parametrize('defect',[None,'proof_missing','different_patch','scoring_change'])
+def test_only_exact_preapproved_display_repair_with_proof_is_compatible(defect):
+    name='src/avfuse/member3_runtime/cli.py'
+    old='c10bbe905f6d78b57590d2f2d851ec5a33c7bde914d981af661ae81ecb3b92a0'
+    new='8bdff2f3604bbf7726b831c0bb6423361570e8520974b65ab10efdf1ed352dde'
+    context={'pilot_source_sha256':{name:old,'scoring.py':'a'*64}}
+    registry={'source:'+name:{'sha256':new},'source:scoring.py':{'sha256':'a'*64}}
+    checks={'additional_source_sha256':{name:new}}
+    if defect=='proof_missing':checks={}
+    if defect=='different_patch':registry['source:'+name]['sha256']='b'*64
+    if defect=='scoring_change':registry['source:scoring.py']['sha256']='b'*64
+    if defect is None:f.verify_pilot_source_compatibility(context,registry,checks)
+    else:
+        with pytest.raises(ValueError):f.verify_pilot_source_compatibility(context,registry,checks)
