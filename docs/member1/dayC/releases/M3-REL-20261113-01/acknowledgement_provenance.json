@@ -1,0 +1,14 @@
+{
+  "record_type": "afml_member3_owner_acknowledgement_provenance",
+  "release_id": "M3-REL-20261113-01",
+  "owner_identity": "Mirunjai",
+  "owner_role": "authorised AFML Member 3 owner",
+  "source": "written message supplied by the owner in this ChatGPT conversation",
+  "recorded_at": "2026-11-13T23:51:00+05:30",
+  "timezone": "Asia/Kolkata",
+  "external_owner_acknowledgement": true,
+  "human_member3_owner_acknowledgement": true,
+  "digital_signature_claimed": false,
+  "exact_statement": "I, Mirunjai, am the authorised Member 3 owner for AFML.\n\nI have reviewed and explicitly approve the existing Member 3 release M3-REL-20261113-01, including its original benchmark/runtime evidence, evidence hashes, conversion-overhead interpretation, isolated operator scope, separate preprocessing reporting and stated scientific limitations.\n\nI accept the reuse of the original Member 1 real-model evidence without claiming an independent Member 3 reproduction. I confirm that no new experiment or three-clip reproduction is required for this evidence acceptance.\n\nI acknowledge the CPU-only scope, simulated floating-point INT8, unmeasured CPU peak memory, absence of an end-to-end latency claim, and the restriction on held-out test access.\n\nI authorize this written acknowledgement to be recorded as the genuine external Member 3 owner acknowledgement for this release. This does not constitute C9/C10 approval.",
+  "scope_boundary": "No C9/C10 approval and no held-out test access."
+}
