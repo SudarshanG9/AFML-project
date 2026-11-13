@@ -55,3 +55,5 @@ Data, personally sensitive clips, model weights and generated results are exclud
 8. **PRs:** changes to `contracts/`, `configs/`, and orchestration need review from all affected owners.
 
 See `docs/ARCHITECTURE.md`, `docs/OWNERSHIP.md`, `docs/CONTRACTS.md`, and `docs/PLAN_12_DAYS.md`.
+
+Member 3 runtime CLI, architecture, troubleshooting, audit and release checklist: see `docs/member3/` (start with `docs/member3/CLI.md`).
