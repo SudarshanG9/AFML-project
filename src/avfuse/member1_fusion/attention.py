@@ -9,7 +9,7 @@ from torch import Tensor
 from torch.nn.functional import scaled_dot_product_attention
 from avfuse.shared.contracts import PrecisionMode
 from .precision import prepare_qkv, quantize_output
-
+from collections.abc import Callable
 
 def dense_attention(q: Tensor, k: Tensor, v: Tensor, attn_mask: Tensor | None = None) -> Tensor:
     scale = 1.0 / math.sqrt(q.shape[-1])
@@ -29,6 +29,7 @@ def sdpa_attention(q: Tensor, k: Tensor, v: Tensor, attn_mask: Tensor | None = N
     return scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, dropout_p=0.0)
 
 
+
 def fusion_attention(
     q: Tensor,
     k: Tensor,
@@ -36,20 +37,62 @@ def fusion_attention(
     mode: PrecisionMode = "reference",
     backend: str = "sdpa",
     attn_mask: Tensor | None = None,
+    diagnostic_hook: Callable[
+        [str, Tensor, Tensor], None
+    ] | None = None,
 ) -> Tensor:
-    """Experiment only at Q/K/V and fused output; weights/projections unchanged.
-
-    In the targeted policy, unquantized V and output are restored.
-    In the control policy, only Q is restored. These costs are not assumed equal.
     """
+    Apply controlled precision intervention to attention.
+
+    reference:
+        Original Q, K, V and output.
+
+    low_precision:
+        Fake-quantized Q, K, V and output.
+
+    restore_value_output:
+        Fake-quantized Q/K, original V and output.
+
+    restore_query:
+        Original Q, fake-quantized K/V/output.
+
+    All modes preserve the surrounding model weights.
+    """
+
     qq, kk, vv = prepare_qkv(q, k, v, mode)
+
+    if diagnostic_hook is not None:
+        diagnostic_hook("Q", q, qq)
+        diagnostic_hook("K", k, kk)
+        diagnostic_hook("V", v, vv)
+
     if backend == "sdpa":
-        out = sdpa_attention(qq, kk, vv, attn_mask)
+        raw_output = sdpa_attention(
+            qq, kk, vv, attn_mask
+        )
+
     elif backend == "dense":
-        out = dense_attention(qq, kk, vv, attn_mask)
+        raw_output = dense_attention(
+            qq, kk, vv, attn_mask
+        )
+
     else:
-        raise ValueError(f"Unsupported backend: {backend}")
-    return quantize_output(out, mode)
+        raise ValueError(
+            f"Unsupported attention backend: {backend}"
+        )
+
+    output = quantize_output(
+        raw_output, mode
+    )
+
+    if diagnostic_hook is not None:
+        diagnostic_hook(
+            "attention_output",
+            raw_output,
+            output,
+        )
+
+    return output
 
 
 def score_matrix_bytes(q: Tensor, k: Tensor) -> int:
