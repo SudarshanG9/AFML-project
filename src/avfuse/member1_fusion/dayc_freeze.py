@@ -11,11 +11,14 @@ from avfuse.member1_fusion.dayc_guards import (
     ensure_inside_repo,read_strict_json,require_human_approval,require_new_file,
     require_sha256,sha256_file,write_new_json)
 from avfuse.member1_fusion.dayc_validation import MODES
+from avfuse.member1_fusion.dayc_test_contract import (canonical_release,cohort_contract,validate_path_policy,OFFICIAL_M2_SHA)
 
 CHECKPOINT='e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e'
 PURPOSE='one frozen full four-mode held-out DiMoDif inference for original Day 10'
 PREPARATION_TEXT="no I need you to speedrun through B3 and we'll test B2 and B3 together for any auditing. Implement B3 part as a whole block and after that we'll review and audit"
 SCORING_FILES=(
+    'scripts/dayC_member1/build_day10_package.py','scripts/dayC_member1/colab_day10.py',
+    'src/avfuse/member1_fusion/dayc_test_contract.py',
     'src/avfuse/member1_fusion/precision.py','src/avfuse/member1_fusion/attention.py',
     'src/avfuse/member1_fusion/dimodif_intervention.py','src/avfuse/member1_fusion/dimodif_adapter.py',
     'src/avfuse/member1_fusion/dayc_precision_audit.py','src/avfuse/member1_fusion/dayc_guards.py',
@@ -73,7 +76,14 @@ def approved_runtime(context):
 
 
 def validate_owner_release(record,owner,expected):
-    finite_tree(record)
+    evidence=deepcopy(record)
+    if owner=='member2' and canonical_release(record) and 'test_cache' in record:
+        # This is the owner's explicit filename convention, not a missing asset
+        # placeholder. Permit only that exact template, without changing raw bytes.
+        require(record['test_cache']['path']=='Drive avfuse/dimodif_emb/test/<clip_id>/features.npz + meta.json',
+            'Unexpected owner cache template')
+        evidence['test_cache']['path']='Drive avfuse/dimodif_emb/test/{clip_id}/features.npz + meta.json'
+    finite_tree(evidence)
     require(record.get('owner')==owner and record.get('external_owner_acknowledgement') is True,
             'Missing external '+owner+' acknowledgement')
     for key in ('release_id','acknowledgement_source','approved_at'):
@@ -88,16 +98,18 @@ def validate_owner_release(record,owner,expected):
             and record.get('fixed_threshold')==expected['fixed_threshold'],'Final threshold/calibration differs')
         require(record.get('threshold_selected_on')=='val' and type(record.get('n_boot')) is int and record.get('n_boot')==1000 and type(record.get('seed')) is int and record.get('seed')==0,
                 'Member2 threshold/bootstrap protocol differs')
-        require(record.get('score_orientation')=='probability_of_fake' and record.get('sealed_test') is True,'Missing test seal/orientation')
-        require(record.get('test_model_predictions_used_for_policy_selection')==0
+        require(record.get('score_orientation') in {'probability_of_fake','probability_of_fake (checked: ok for all val configs)'} and record.get('sealed_test') is True,'Missing test seal/orientation')
+        require((type(record.get('test_model_predictions_used_for_policy_selection')) is int and record['test_model_predictions_used_for_policy_selection']==0
+            or record.get('test_model_predictions_used_for_policy_selection') is False)
             and record.get('known_test_label_summary_access_acknowledged') is True,'Missing test-exposure disclosure')
-        require(record.get('stratification_scope')=='analysis_subsets' and bool(record.get('source_group_definition')),
+        require(record.get('stratification_scope') in {'analysis_subsets','analysis_subsets: per fake type, that type + all real; whole groups resampled with replacement; category counts vary per replicate'} and bool(record.get('source_group_definition')),
                 'Member2 must explicitly acknowledge the actual cluster/bootstrap method')
         identity=record.get('ready_test_manifest',{})
         require(isinstance(identity.get('path'),str) and re.fullmatch('[0-9a-f]{64}',identity.get('sha256','')),
                 'Missing opaque ready-test manifest identity')
         require(type(identity.get('expected_count')) is int and identity['expected_count']>0,'Missing full held-out cohort count')
         require(bool(record.get('one_time_evaluation_purpose')) and bool(record.get('limitations')),'Incomplete Member2 release')
+        cohort_contract(record)
     elif owner=='member3':
         require(record.get('runtime')==expected['runtime'],'Member3 runtime differs from approved arrangement')
         for key,value in {'device':'cpu','backend':'sdpa','batch_size':1,'warmup':10,'repeats':50,
@@ -153,7 +165,7 @@ def expected_owner_context(root,context,registry):
 
 
 def build_draft(*,context,registry,evidence_packet=None,member2_release=None,member3_release=None,
-                expected=None,c8b_accepted=False,interpretation=None):
+                expected=None,c8b_accepted=False,interpretation=None,feature_path_policy=None):
     """Pure preparation: missing evidence stays null with explicit blockers, never fabricated."""
     finite_tree(registry);blockers=[];table=None;findings=None
     if not c8b_accepted:blockers.append('C8B scientific acceptance not yet supplied; combined B2/B3 source preparation only')
@@ -168,6 +180,14 @@ def build_draft(*,context,registry,evidence_packet=None,member2_release=None,mem
     required=set(BASE_REQUIRED)|{'source:'+p for p in SCORING_FILES}
     if required-set(registry):blockers.append('Freeze identity registry incomplete: '+', '.join(sorted(required-set(registry))))
     if interpretation is None:blockers.append('Lead interpretation not proposed/approved; no policy selected')
+    if member2_release and canonical_release(member2_release):
+        if feature_path_policy is None:blockers.append('Held-out cache/runtime path policy must be proposed before C9')
+        else:
+            validate_path_policy(feature_path_policy)
+            require(feature_path_policy['kind']=='split_clip_cache','Canonical cohort requires explicit original cache resolution')
+        if registry.get('ready_test_manifest')!=registry.get('canonical_manifest'):
+            blockers.append('Canonical test selector must bind the same opaque canonical manifest entry')
+    elif feature_path_policy is not None:validate_path_policy(feature_path_policy)
     from avfuse.member1_fusion.dayc_research import LIMITATIONS
     limitations=LIMITATIONS+[
         'Trailing-silence shortcut warning: validation AUROC about 0.682; previously inspected test summary about 0.660; matched-control result outstanding.',
@@ -188,6 +208,15 @@ def build_draft(*,context,registry,evidence_packet=None,member2_release=None,mem
         'member3_release_id':member3_release['release_id'] if member3_release else None,
         'requires_approvals':['member1_lead','member2_evaluation','member3_runtime'],
         'blockers':blockers,'ready_for_freeze':not blockers,'heldout_inference_authorized':False}
+    if member2_release:
+        proposal['heldout_cohort']=cohort_contract(member2_release)
+        proposal['owner_scientific_corrections']=deepcopy(member2_release['limitations'])
+        if canonical_release(member2_release):
+            proposal['limitations']=[v for v in limitations if v not in {LIMITATIONS[1],LIMITATIONS[2]} and not v.startswith('Trailing-silence shortcut warning:')]
+            proposal['limitations']+=['Member2 reports zero source-level LAV-DF train overlap; speaker separation remains unverified.',
+                'Member2 reports validation silence control without detector drop for the three earlier configurations; duration uncontrolled; no query-specific control established.',
+                'No pre-existing per-test-file tensor SHA inventory supplied; complete C10-time checks establish acquisition identity, not independent original-byte equivalence.']
+    proposal['feature_path_policy']=deepcopy(feature_path_policy or {'kind':'project_local_only'})
     finite_tree(proposal);return proposal
 
 
@@ -201,8 +230,8 @@ def validate_complete_proposal(root,proposal,context):
     require(proposal.get('selected_interpretation') in {'reference_preferred','no_restoration_justified',
         'restoration_conditionally_supported','inconclusive'},'Missing/invalid lead-reviewed interpretation')
     from avfuse.member1_fusion.dayc_research import LIMITATIONS
-    require(set(LIMITATIONS).issubset(set(proposal.get('limitations',[]))),'Mandatory limitations omitted')
-    require(any('Trailing-silence shortcut' in v for v in proposal['limitations']),'Shortcut warning omitted')
+    require(set(LIMITATIONS)-{LIMITATIONS[1],LIMITATIONS[2]}<=set(proposal.get('limitations',[])),'Mandatory limitations omitted')
+    validate_path_policy(proposal.get('feature_path_policy',{'kind':'project_local_only'}))
     require(type(proposal.get('test_score_accesses_for_policy_selection')) is int and proposal.get('test_score_accesses_for_policy_selection')==0,'Test-based policy selection forbidden')
     registry=verify_registry(root,proposal['evidence_hashes'])
     for path,expected_sha in context['pilot_source_sha256'].items():
@@ -242,6 +271,14 @@ def validate_complete_proposal(root,proposal,context):
         require(registry['predictions_'+mode]['sha256']==packet['evidence']['prediction_sha256'][mode],
                 'Prediction/evidence identity mismatch')
     owner2=read_strict_json(ensure_inside_repo(root,registry['member2_release']['path'],must_exist=True))
+    require(proposal.get('heldout_cohort')==cohort_contract(owner2),'Cohort selector differs from owner release')
+    require(proposal.get('owner_scientific_corrections')==owner2['limitations'],'Owner corrections changed')
+    if canonical_release(owner2):
+        require(registry['member2_release']['sha256']==OFFICIAL_M2_SHA,'Official release bytes changed')
+        require(registry['ready_test_manifest']==registry['canonical_manifest'],'Canonical cohort alias differs')
+        require(proposal['feature_path_policy']['kind']=='split_clip_cache','Canonical cohort needs original cache mapping')
+    else:
+        require(set(LIMITATIONS)<=set(proposal['limitations']),'Historical limitations omitted')
     require(registry['ready_test_manifest']['sha256']==owner2['ready_test_manifest']['sha256'],
             'Opaque test-manifest identity differs from owner release')
     require(proposal['decision_table']==packet['decision_table'],'Decision table changed')
@@ -289,7 +326,8 @@ def finalize_proposal(root,proposal_path,c9_approval,c8b_approval,anchor_dir,con
         'device':'cpu','runtime':expected['runtime'],'checkpoint_sha256':CHECKPOINT,
         'precision':'symmetric_dynamic_per_tensor_fake_INT8_in_floating_point','layers':5,
         'score_orientation':'probability_of_fake','fixed_threshold':proposal['fixed_threshold'],
-        'inputs':deepcopy(registry),'feature_path_policy':{'kind':'project_local_only'},
+        'inputs':deepcopy(registry),'feature_path_policy':deepcopy(proposal.get('feature_path_policy',{'kind':'project_local_only'})),
+        'heldout_cohort':deepcopy(proposal.get('heldout_cohort',{'kind':'ready_manifest','split':'test','expected_count':m2['ready_test_manifest']['expected_count']})),
         'one_attempt_rule':True,'no_post_test_tuning':True,'known_test_label_summary_access':True,
         'member2_release_id':proposal['member2_release_id'],'member3_release_id':proposal['member3_release_id'],
         'purpose':PURPOSE,'approved_c9_context_sha256':sha256_file(proposal_path),
@@ -318,7 +356,9 @@ def validate_frozen_contract(policy,run):
     require(run.get('fixed_threshold')==policy.get('fixed_threshold'),'Frozen threshold mismatch')
     require(type(run.get('expected_count')) is int and run['expected_count']>0,'Missing full cohort count')
     require(run.get('precision')=='symmetric_dynamic_per_tensor_fake_INT8_in_floating_point','Precision semantics differ')
-    require(run.get('feature_path_policy')=={'kind':'project_local_only'},'Unapproved test cache path policy')
+    validate_path_policy(run.get('feature_path_policy'))
+    require(run['feature_path_policy']==policy.get('feature_path_policy',{'kind':'project_local_only'}),'Frozen cache path policy differs from approved proposal')
+    if 'heldout_cohort' in policy:require(run.get('heldout_cohort')==policy['heldout_cohort'],'Frozen cohort policy differs')
     require(run.get('inputs')==policy.get('evidence_hashes'),'Frozen dependency registry differs')
 
 

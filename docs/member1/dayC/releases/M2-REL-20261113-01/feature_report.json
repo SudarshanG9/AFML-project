@@ -1,0 +1,100 @@
+{
+  "n_ok": 3200,
+  "n_failed": 0,
+  "failed_examples": [],
+  "per_split_ok": {
+    "test": 2000,
+    "val": 1200
+  },
+  "video_dim": [
+    768
+  ],
+  "audio_dim": [
+    768
+  ],
+  "dtype": [
+    "float32"
+  ],
+  "T_v": {
+    "min": 70.0,
+    "median": 182.0,
+    "p95": 413.0499999999997,
+    "max": 497.0,
+    "mean": 212.620625
+  },
+  "T_a": {
+    "min": 72.0,
+    "median": 184.0,
+    "p95": 414.0,
+    "max": 497.0,
+    "mean": 213.6903125
+  },
+  "T_v_minus_T_a": {
+    "min": -3.0,
+    "median": -1.0,
+    "p95": 0.0,
+    "max": 1.0,
+    "mean": -1.0696875
+  },
+  "T_v_minus_video_frames": {
+    "min": 0.0,
+    "median": 0.0,
+    "p95": 0.0,
+    "max": 0.0,
+    "mean": 0.0
+  },
+  "longer_than_600": 0,
+  "frames_without_landmarks": {
+    "min": 0.0,
+    "median": 0.0,
+    "p95": 0.0,
+    "max": 0.0,
+    "mean": 0.0
+  },
+  "timings_ms": {
+    "landmarks_ms": {
+      "min": 580.87,
+      "median": 1689.9,
+      "p95": 3850.8479999999963,
+      "max": 5915.69,
+      "mean": 1951.449359375
+    },
+    "video_load_crop_ms": {
+      "min": 126.89,
+      "median": 342.365,
+      "p95": 763.9179999999999,
+      "max": 1240.71,
+      "mean": 390.43668749999995
+    },
+    "audio_load_ms": {
+      "min": 4.07,
+      "median": 7.155,
+      "p95": 12.44,
+      "max": 22.98,
+      "mean": 7.713375000000001
+    },
+    "video_encode_ms": {
+      "min": 36.06,
+      "median": 99.89500000000001,
+      "p95": 212.40099999999993,
+      "max": 279.08,
+      "mean": 109.043534375
+    },
+    "audio_encode_ms": {
+      "min": 30.03,
+      "median": 63.62,
+      "p95": 122.591,
+      "max": 146.71,
+      "mean": 69.38432187500001
+    }
+  },
+  "environment": {
+    "python": "3.10.22",
+    "torch": "2.5.1+cu121",
+    "torchvision": "0.20.1+cu121",
+    "torchaudio": "2.5.1+cu121",
+    "device": "cuda:0",
+    "gpu": "Tesla T4",
+    "mediapipe": "0.10.15"
+  }
+}

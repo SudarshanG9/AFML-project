@@ -1,0 +1,78 @@
+{
+  "release_id": "M2-REL-20261113-01",
+  "status": "ACKNOWLEDGED_WITH_CORRECTIONS",
+  "owner": "member2",
+  "external_owner_acknowledgement": true,
+  "acknowledgement_source": "Akhil Mangipudi (Member 2), team chat reply to Member 1's release draft",
+  "approved_at": "2026-11-13T10:40:40+05:30",
+  "canonical_manifest_sha256": "8339b2476a71e62c6c6fca7d937ba4cc7a704b09d26f08506c20d1f10de8f3dd",
+  "checkpoint_sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e",
+  "fixed_threshold": 0.6627789735794068,
+  "threshold_selected_on": "val",
+  "threshold_independently_reproduced": "Member 2 recomputed 0.662779 from reference val at 5% real FPR (m2_eval_dayB/protocol.json)",
+  "protocol_sha256": "358c037242f6980fed2a8d0ff0ef830f17b4789676b391c8f6dff245842b37dd",
+  "n_boot": 1000,
+  "seed": 0,
+  "source_group_definition": "connected groups over source_id and identity_id (union-find); identity_id = source_id, not verified speaker identity",
+  "stratification_scope": "analysis_subsets: per fake type, that type + all real; whole groups resampled with replacement; category counts vary per replicate",
+  "score_orientation": "probability_of_fake (checked: ok for all val configs)",
+  "four_modes": [
+    "reference",
+    "low_precision",
+    "restore_value_output",
+    "restore_query"
+  ],
+  "ready_test_manifest": {
+    "path": "Drive avfuse/m2_handoff/manifest_whole.jsonl (rows with split == 'test'; no separate test file, not regenerated)",
+    "sha256": "8339b2476a71e62c6c6fca7d937ba4cc7a704b09d26f08506c20d1f10de8f3dd",
+    "expected_count": 2000,
+    "by_type": {
+      "real": 500,
+      "audio_fake": 500,
+      "video_fake": 500,
+      "both_fake": 500
+    },
+    "source_groups": 1738
+  },
+  "test_cache": {
+    "path": "Drive avfuse/dimodif_emb/test/<clip_id>/features.npz + meta.json",
+    "folders": 2000,
+    "ids_match_manifest_1to1": true,
+    "coverage_report": {
+      "file": "m2_handoff/feature_coverage_report.json",
+      "sha256": "f6f9ad4b92123b3b0ee75e99843574b202370cc744da79ba03559a538eb3b583",
+      "valid_test": 2000,
+      "n_problems": 0
+    },
+    "provenance": {
+      "file": "m2_handoff/extraction_provenance.json",
+      "sha256": "44869eb7609a6621abd4fe308aa28b34551d4c9d8d2b1dd27abe1913377e13f5"
+    },
+    "extraction_report": {
+      "file": "m2_handoff/feature_report.json",
+      "sha256": "2db002749e63da5ad67fba1da3ddf39854349aac1a03a03f649d77f8ac5a20b4"
+    }
+  },
+  "sealed_test": true,
+  "test_model_predictions_used_for_policy_selection": false,
+  "test_model_predictions_exist_with_member2": false,
+  "test_access_ledger_entries": 0,
+  "known_test_label_summary_access_acknowledged": true,
+  "test_label_derived_summaries_inspected": [
+    "category counts and source-group counts (manifest build, split audit)",
+    "source-overlap check vs LAV-DF train (0 of 1,738 test sources)",
+    "media shortcut audit on test (trailing-silence AUROC 0.660; duration/bitrate/frames just below 0.65); no model scores involved"
+  ],
+  "limitations": [
+    "Validation checkpoint-selection bias; validation findings are not held-out generalization.",
+    "Source grouping is not verified speaker separation. CORRECTED: source-level checkpoint-training overlap WAS checked against the full LAV-DF train split (78,703 videos / 21,254 sources): 0 val and 0 test sources (m2_handoff/train_overlap.json, sha f29f219904c3). Speaker-level overlap remains unverifiable.",
+    "CORRECTED: trailing-silence shortcut controlled on val (shortcut 0.682 -> 0.502 on matched 520; detector 0.998 -> 0.999, no drop, all three val configs). Duration and other shortcuts were not controlled.",
+    "Test-label-derived summaries (listed above) were inspected before the freeze; no test model predictions were. Do not claim completely untouched test labels.",
+    "Fake INT8 executes in floating point; no real integer-kernel acceleration claim.",
+    "The all-five-layer intervention is cumulative; deeper upstream hidden states can differ.",
+    "BCE intervals do not include benchmark timing uncertainty; Day B CPU timings were noisy and are not used for cost claims.",
+    "Approved dependency drift does not establish original-versus-current population/runtime equivalence."
+  ],
+  "one_time_evaluation_purpose": "Single frozen four-mode held-out evaluation after lead C9/C10 approvals",
+  "prepared_at_utc": "2026-11-12T20:53:15.564859+00:00"
+}

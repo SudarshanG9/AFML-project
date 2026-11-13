@@ -1,0 +1,32 @@
+{
+  "branch": "feature/member2-data",
+  "manifest_commit": "95bd42d",
+  "extraction_commit": "9eeea65540aa9a77def3700ae50914c69cb11f38",
+  "environment": {
+    "python": "3.10.22",
+    "torch": "2.5.1+cu121",
+    "torchvision": "0.20.1+cu121",
+    "torchaudio": "2.5.1+cu121",
+    "device": "cuda:0",
+    "gpu": "Tesla T4",
+    "mediapipe": "0.10.15"
+  },
+  "video_encoder": "auto-AVSR LRS3_V_WER19.1 (mpc001/Visual_Speech_Recognition_for_Multiple_Languages)",
+  "audio_encoder": "auto-AVSR LRS3_A_WER1.0 (same repo)",
+  "face_detector": "MediaPipe 0.10.15",
+  "dimodif_checkpoint": {
+    "file": "dfd_lavdf_reduceonplateau_64_4_1_5_True.pth",
+    "sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e"
+  },
+  "sha256": {
+    "feature_coverage_report.json": "f6f9ad4b92123b3b0ee75e99843574b202370cc744da79ba03559a538eb3b583",
+    "feature_report.json": "2db002749e63da5ad67fba1da3ddf39854349aac1a03a03f649d77f8ac5a20b4",
+    "manifest_whole.jsonl": "8339b2476a71e62c6c6fca7d937ba4cc7a704b09d26f08506c20d1f10de8f3dd",
+    "train_overlap.json": "f29f219904c3b137c45faccc0a5908f5c5c5b6c2786217ce0698e1e81f040d1c",
+    "video_features.csv": "61b595fde507afecf4248492be129634b41f9230164bdb772a93c30cbbd2d1ee",
+    "videos_whole.csv": "112b78e5cb1a3d06a8fffed11d0197841ce1230acc4df8dd6dce1f83b70b61e5",
+    "manifest_whole_val.jsonl": "22d1d9e02403cfdbb05f2116da16bc4015f540547a4ac00bf6b7127c119e359c",
+    "split_integrity.json": "334b7d2d1dacaf57d35a320a2a590b6b5a1feebedb96315308e40f081c071f17",
+    "manifest_whole_report.json": "fc390f962dade0f9d2af4b786e869435af1aa6f4f250540b9f4d87fb7dd95679"
+  }
+}

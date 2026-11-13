@@ -1,0 +1,21 @@
+{
+  "manifest_rows": 3200,
+  "unique_clip_ids": 3200,
+  "valid_per_split": {
+    "val": 1200,
+    "test": 2000
+  },
+  "expected_per_split": {
+    "val": 1200,
+    "test": 2000
+  },
+  "n_problems": 0,
+  "problems": [],
+  "folders_not_in_manifest": {
+    "val": 0,
+    "test": 0
+  },
+  "checks": "folder + features.npz exist; meta.json status ok, float32, (T,768) both streams, T>0. Full array load (finite values, shapes) was verified on 2,800/3,200 before the Colab session dropped.",
+  "manifest_sha256": "8339b2476a71e62c6c6fca7d937ba4cc7a704b09d26f08506c20d1f10de8f3dd",
+  "created": "2026-11-07T11:48:15"
+}
