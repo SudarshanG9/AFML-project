@@ -279,3 +279,114 @@ with tempfile.TemporaryDirectory() as tmp:
   stage profiles use their own artifact type; this is a schema limitation for Member 1/2 review.
 - Real checkpoint/cache hashing awaits Member 1's checkpoint and Member 2's feature cache;
   CUDA/MPS records have only been built from synthetic measurement dictionaries (no GPU/MPS run).
+
+## Segment E: four-mode orchestration, predictions and cached-feature benchmarking
+
+Modules: `feature_loader.py`, `runner.py` (extended), `predictions.py`, `model_benchmark.py`,
+`experiment.py` (run glue; the user-facing CLI is Segment F). Everything below consumes Member 1's
+`ModelAdapter` interface and Member 2's files as they are; nothing of theirs is modified.
+
+### What works with the current real DiMoDif adapter
+
+| Mode | Status with `DiMoDifAdapter` |
+|---|---|
+| `reference` | supported |
+| `low_precision`, `restore_value_output`, `restore_query` | **unsupported** (`NotImplementedError` from Member 1) |
+
+A real four-mode experiment cannot be completed until Member 1 integrates all four modes into
+the model's fusion attention. Segment E reports the unsupported modes and writes nothing that could
+be mistaken for a four-mode result. The standalone `fusion_attention()` is deliberately not used.
+
+### Feature formats (explicit, never guessed)
+
+```python
+from avfuse.member3_runtime.feature_loader import (
+    load_dimodif_features, load_shared_pt_features, dimodif_npz_path, make_feature_provider, ClipRef)
+
+feats = load_dimodif_features("<feature_root>/val/<video_id>/features.npz")   # dimodif_npz
+feats = load_shared_pt_features("data/cache/<id>.pt")                         # shared_pt (Member 2 loader)
+provider = make_feature_provider("dimodif_npz", feature_root)                 # provider(ClipRef) -> dict
+```
+
+The whole-video manifest's `feature_path` column still holds the planned `.pt` path; for the NPZ layout
+it is ignored and the path is built from `feature_root/split/clip_id/features.npz`. `T_v` and `T_a` are
+kept as stored; alignment/padding/FP32 belong to `DiMoDifAdapter.prepare_features`. The loader never
+sees labels (`ClipRef` has `clip_id`, `split`, `feature_path` only).
+
+### Per-mode status
+
+```python
+from avfuse.member3_runtime.runner import run_precision_sweep
+r = run_precision_sweep(model, features, modes=("reference",))            # reference-only development
+r = run_precision_sweep(model, features)                                  # strict four-mode
+r.status                # complete | blocked | partial | failed
+r.unsupported_modes     # e.g. ('low_precision', ...)
+r.results["low_precision"].error_message   # the reason; no score, never 0
+```
+
+`NotImplementedError` => `unsupported`; any other error raises `ModeFailedError`; scores must be
+finite, shape `(batch,)` and in `[0,1]` (never clipped or inverted). `allow_partial=True` is a
+development aid and is labelled `partial`.
+
+### Predictions
+
+```python
+from avfuse.member3_runtime.predictions import generate_predictions, load_clip_refs
+clips = load_clip_refs("manifest_whole.jsonl", "val")      # label-free ClipRef list
+report = generate_predictions(model, clips, provider, run_id=ctx.run_id,
+                              checkpoint_sha256=model.checkpoint_sha256,
+                              output_path="predictions.jsonl", split="val",
+                              modes=("reference",), require_lavdf_hash=True)
+```
+
+One row per `clip_id x config` with only the six required schema fields. Rows are validated with
+Member 2's `validate_predictions`, buffered, and published atomically (no file on failure; an existing
+file is preserved unless `overwrite=True`). A strict run with an unsupported mode stops at the first clip,
+publishes nothing and returns `status="blocked"`. `val` is the default. `split="test"` needs an existing
+frozen `protocol_path`, `unseal=True` and a non-empty `purpose`; Member 2's `open_test` is then called once
+with the full config list before any test feature is read. A hash mismatch
+(`expected_checkpoint_sha256`, or `require_lavdf_hash=True` for the agreed LAV-DF hash) raises
+`CheckpointMismatchError` before any inference.
+
+### Cached-feature model benchmark
+
+```python
+from avfuse.member3_runtime.model_benchmark import benchmark_precision_modes
+res = benchmark_precision_modes(model, features, ctx=ctx, device="cpu", warmup=10, repeats=50)
+```
+
+Times `model.predict_from_cached_features(features, mode)` on one fixed sample with Segment B's
+`benchmark_callable`, scope `cached_feature_model`, input boundary `cached_encoder_tokens`, backend `none`
+unless a verified backend is passed. This is not raw-video end-to-end latency. `conversion_overhead_ms` is
+`null` unless Member 1 supplies a dedicated conversion-only callable
+(`ConversionBenchmark`); it is never derived by subtracting latencies. Unsupported modes yield no record;
+a strict run with any unsupported mode times nothing. An unavailable device raises (no CPU fallback).
+Use a validation sample (never test) for development benchmarking. The record's `input_identity_sha256` is
+a hash of the exact benchmarked tensors (`sha256-tensor-bytes-v1`), not of the whole cache.
+
+### Run integration
+
+```python
+from avfuse.member3_runtime.experiment import execute_experiment, run_dimodif_reference
+summary = execute_experiment(model, ctx, clips, provider, checkpoint_sha256=sha,
+                             modes=("reference",))     # predictions + benchmark + summary
+```
+
+Registers `predictions.jsonl` and `execution_summary.json` with the `RunContext`; calls `finalize()` and
+`verify()` only when every requested mode and every clip of the requested split completed, and the requested
+benchmark was not blocked. Blocked/partial/failed runs are not finalized and keep
+a summary (`execution_summary.json` or `failure_summary.json`). `run_dimodif_reference(...)` wires the real
+reference path (whole-video manifest + NPZ features + `DiMoDifAdapter`) from caller-supplied paths and
+raises `MissingInputError` for absent inputs. **Pass `cache_dir=<feature_root>/val` to
+`create_run_context` for validation runs** so provenance hashing does not read test features.
+
+### Segment E limitations
+
+- Real `DiMoDifAdapter` runs, GPU/MPS timings and actual score orientation checks were not executed here
+  (no checkpoint, upstream repo or accelerator in the test environment); tests use mock adapters and
+  synthetic temp files and say nothing about detector performance.
+- Prediction generation processes one video per call (batch size 1), matching the whole-video feature layout.
+- The test-access ledger is written before test inference starts; a later failure therefore still leaves
+  a logged access (intentional: the attempt is recorded). Run a strict validation pass first.
+- For the sealed test prediction pass, set `benchmark=False`; model-level timing must be collected
+  from validation features, never from the held-out test split.
