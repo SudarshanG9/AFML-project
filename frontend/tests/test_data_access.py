@@ -11,7 +11,7 @@ import torch
 from avfuse_ui.data_access import (
     documented_shortcut_table,
     documented_validation_table,
-    documented_test_results,
+    documented_test_results,\n    documented_benchmark_summary,
     discover_files,
     feature_file_summary_bytes,
     parse_jsonl_text,
@@ -169,3 +169,21 @@ Paired BCE differences (same videos):
     assert parsed['metadata']['threshold'] == pytest.approx(0.6627789735794068)
     assert len(parsed['per_type']) == 3
     assert len(parsed['paired_bce']) == 4
+
+
+
+def test_documented_benchmark_summary_parses_reported_typical_p50() -> None:
+    report = """Verified typical p50 ms: reference 4.20; low_precision 4.15; restore_value_output 4.24; restore_query 4.18
+Typical E_value = +0.09 ms
+Typical E_query = −0.03 ms
+"""
+    parsed = documented_benchmark_summary(report)
+    assert parsed is not None
+    assert parsed["scope"] == "cached_feature_model"
+    assert parsed["p50_ms"]["reference"] == pytest.approx(4.20)
+    assert parsed["extra_cost_ms"]["value_output_vs_low_precision"] == pytest.approx(0.09)
+    assert parsed["extra_cost_ms"]["query_vs_low_precision"] == pytest.approx(-0.03)
+
+
+def test_documented_benchmark_summary_ignores_unrecognized_report() -> None:
+    assert documented_benchmark_summary("No benchmark data here") is None
