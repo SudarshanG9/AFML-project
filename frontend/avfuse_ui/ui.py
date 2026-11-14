@@ -638,6 +638,49 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
             source = str(path)
         except Exception as exc:
             st.error(f"Could not read metrics report: {type(exc).__name__}: {exc}")
+    # A committed held-out summary is documentation, not a freshly loaded metrics.json artifact.
+    test_doc = root / "docs/member2/results/TEST_RESULTS.md"
+    if test_doc.is_file():
+        text = test_doc.read_text(encoding="utf-8", errors="replace")
+        documented = documented_test_results(text)
+        if documented["rows"]:
+            meta = documented["metadata"]
+            st.info("Showing Member 2's committed held-out test summary. These are documented results, not a newly computed evaluation or a verified live prediction import.")
+            st.caption(f"Documentation source: {test_doc.relative_to(root)} · Reported prediction run: {meta.get('run_id', 'not stated')}")
+            if meta.get("total_test_videos"):
+                st.write(f"**Reported test cohort:** {meta['total_test_videos']:,} videos · **Source groups:** {meta.get('source_groups', 'not stated'):,}")
+            if meta.get("threshold") is not None:
+                st.write(f"**Validation-frozen threshold:** {meta['threshold']:.6f} · **Bootstrap:** {meta.get('bootstrap_resamples', 'not stated')} resamples, seed {meta.get('bootstrap_seed', 'not stated')}")
+            table = []
+            for row in documented["rows"]:
+                table.append({
+                    "Configuration": CFG_LABELS.get(row["config"], row["config"]),
+                    "AUROC": f"{row['auroc']:.4f} [{row['auroc_ci_low']:.4f}, {row['auroc_ci_high']:.4f}]",
+                    "AUPRC": f"{row['auprc']:.4f}", "BCE": f"{row['bce']:.4f}",
+                    "Recall": f"{row['recall']:.3f}", "Real FPR": f"{row['real_fpr']:.3f}",
+                })
+            panel_title("Published held-out results", "Transcribed from Member 2's checked-in report; AUROC confidence intervals are shown as published.")
+            st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
+            per_type = documented.get("per_type", [])
+            if per_type:
+                panel_title("Reference performance by manipulation type")
+                st.dataframe(pd.DataFrame([{
+                    "Manipulation": row["manipulation_type"].replace("_", " "),
+                    "AUROC": row["auroc"], "Recall": row["recall"],
+                } for row in per_type]), use_container_width=True, hide_index=True)
+            paired = documented.get("paired_bce", [])
+            if paired:
+                panel_title("Paired BCE contrasts", "Intervals crossing zero are inconclusive; they do not establish equivalence.")
+                st.dataframe(pd.DataFrame([{
+                    "Contrast": row["contrast"], "Delta BCE": row["delta_bce"],
+                    "95% CI": f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}]",
+                    "CI excludes zero": row["ci_low"] > 0 or row["ci_high"] < 0,
+                } for row in paired]), use_container_width=True, hide_index=True)
+            st.warning("Report limitations: simulated INT8 uses floating-point arithmetic; no hardware speedup is established. Source groups do not prove speaker independence, duration was not controlled, and test-label-derived summaries were inspected before freeze. The report records three inference attempts, including a failed pre-scoring attempt and a stopped attempt.")
+            with st.expander("Read the complete Member 2 test report"):
+                st.markdown(text)
+            st.caption("For machine-readable paired metrics, import the corresponding structured metrics JSON when available. This documentation view does not synthesize missing confidence intervals or prediction files.")
+            return
     if report:
         errors = validate_metrics_report(report)
         split = report.get("split")
@@ -722,49 +765,6 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
             st.dataframe(pd.DataFrame(p_rows), use_container_width=True, hide_index=True)
         st.caption(f"Bootstrap resamples: {report.get('n_boot', 'not recorded')} · seed: {report.get('seed', 'not recorded')} · manifest SHA-256: {report.get('manifest_sha256', 'not recorded')}")
         return
-    # A committed held-out summary is documentation, not a freshly loaded metrics.json artifact.
-    test_doc = root / "docs/member2/results/TEST_RESULTS.md"
-    if test_doc.is_file():
-        text = test_doc.read_text(encoding="utf-8", errors="replace")
-        documented = documented_test_results(text)
-        if documented["rows"]:
-            meta = documented["metadata"]
-            st.info("Showing Member 2's committed held-out test summary. These are documented results, not a newly computed evaluation or a verified live prediction import.")
-            st.caption(f"Documentation source: {test_doc.relative_to(root)} · Reported prediction run: {meta.get('run_id', 'not stated')}")
-            if meta.get("total_test_videos"):
-                st.write(f"**Reported test cohort:** {meta['total_test_videos']:,} videos · **Source groups:** {meta.get('source_groups', 'not stated'):,}")
-            if meta.get("threshold") is not None:
-                st.write(f"**Validation-frozen threshold:** {meta['threshold']:.6f} · **Bootstrap:** {meta.get('bootstrap_resamples', 'not stated')} resamples, seed {meta.get('bootstrap_seed', 'not stated')}")
-            table = []
-            for row in documented["rows"]:
-                table.append({
-                    "Configuration": CFG_LABELS.get(row["config"], row["config"]),
-                    "AUROC": f"{row['auroc']:.4f} [{row['auroc_ci_low']:.4f}, {row['auroc_ci_high']:.4f}]",
-                    "AUPRC": f"{row['auprc']:.4f}", "BCE": f"{row['bce']:.4f}",
-                    "Recall": f"{row['recall']:.3f}", "Real FPR": f"{row['real_fpr']:.3f}",
-                })
-            panel_title("Published held-out results", "Transcribed from Member 2's checked-in report; AUROC confidence intervals are shown as published.")
-            st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
-            per_type = documented.get("per_type", [])
-            if per_type:
-                panel_title("Reference performance by manipulation type")
-                st.dataframe(pd.DataFrame([{
-                    "Manipulation": row["manipulation_type"].replace("_", " "),
-                    "AUROC": row["auroc"], "Recall": row["recall"],
-                } for row in per_type]), use_container_width=True, hide_index=True)
-            paired = documented.get("paired_bce", [])
-            if paired:
-                panel_title("Paired BCE contrasts", "Intervals crossing zero are inconclusive; they do not establish equivalence.")
-                st.dataframe(pd.DataFrame([{
-                    "Contrast": row["contrast"], "Delta BCE": row["delta_bce"],
-                    "95% CI": f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}]",
-                    "CI excludes zero": row["ci_low"] > 0 or row["ci_high"] < 0,
-                } for row in paired]), use_container_width=True, hide_index=True)
-            st.warning("Report limitations: simulated INT8 uses floating-point arithmetic; no hardware speedup is established. Source groups do not prove speaker independence, duration was not controlled, and test-label-derived summaries were inspected before freeze. The report records three inference attempts, including a failed pre-scoring attempt and a stopped attempt.")
-            with st.expander("Read the complete Member 2 test report"):
-                st.markdown(text)
-            st.caption("For machine-readable paired metrics, import the corresponding structured metrics JSON when available. This documentation view does not synthesize missing confidence intervals or prediction files.")
-            return
     # Structured metrics may not have been committed. Show the repo's documented validation snapshot as documentation, not as a fresh artifact.
     doc = root / "docs/member2/results/VAL_4MODE_RESULTS.md"
     if doc.is_file():
