@@ -9,7 +9,7 @@ import plotly.express as px
 import streamlit as st
 
 from .data_access import (
-    CONFIGS, documented_validation_table, documented_test_results,
+    CONFIGS, documented_validation_table, documented_test_results, documented_benchmark_summary,
     human_bytes, load_json, load_jsonl, manifest_summary, parse_jsonl_text,
     prediction_summary, shortcut_audit_summary, feature_file_summary_bytes, documented_shortcut_table,
     validate_benchmarks, validate_manifest, validate_metrics_report, validate_predictions,
@@ -785,6 +785,30 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
     page_header("RUNTIME / MEMBER 3", "Benchmark explorer",
                 "Read the Member 3 benchmark records without conflating operator, cached-feature model, or preprocessing costs.")
     st.markdown("<div class='avf-warn'><b>Precision disclosure:</b> all non-reference configurations are simulated fake quantization in floating-point arithmetic. The runtime records do not measure a real INT8 kernel or prove INT8 hardware speedup.</div>", unsafe_allow_html=True)
+
+    with st.expander("Documented benchmark snapshot (optional report upload)"):
+        report = st.file_uploader(
+            "Upload a Markdown benchmark report",
+            type=["md", "markdown", "txt"],
+            key="documented_benchmark_report",
+        )
+        if report is not None:
+            try:
+                snapshot = documented_benchmark_summary(report.getvalue().decode("utf-8"))
+            except UnicodeDecodeError:
+                snapshot = None
+                st.error("The report must be UTF-8 text.")
+            if snapshot is None:
+                st.info("No recognized typical-workload p50 summary was found. Upload the report containing the 'Verified typical p50 ms' summary.")
+            else:
+                st.caption("Documented snapshot only · not a live benchmark run or a validated benchmark-record artifact.")
+                snapshot_df = pd.DataFrame(
+                    [{"Configuration": config, "p50 (ms)": latency}
+                     for config, latency in snapshot["p50_ms"].items()]
+                )
+                st.dataframe(snapshot_df, use_container_width=True, hide_index=True)
+                st.json({"scope": snapshot["scope"], "device": snapshot["device"],
+                         "backend": snapshot["backend"], "extra_cost_ms": snapshot["extra_cost_ms"]})
     selected_paths, uploads = choose_many_local_or_upload(root, "benchmark JSONL files", files["benchmarks"], "benchmarks", ["jsonl", "txt"])
     rows: list[dict[str, Any]] = []
     source = None
