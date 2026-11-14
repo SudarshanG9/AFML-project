@@ -680,7 +680,6 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
             with st.expander("Read the complete Member 2 test report"):
                 st.markdown(text)
             st.caption("For machine-readable paired metrics, import the corresponding structured metrics JSON when available. This documentation view does not synthesize missing confidence intervals or prediction files.")
-            return
     if report:
         errors = validate_metrics_report(report)
         split = report.get("split")
