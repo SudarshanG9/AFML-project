@@ -19,7 +19,7 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 
-from avfuse.member2_data.evaluate import _auprc, _auroc, bce, cluster_resamples, recall_at
+from avfuse.member2_data.evaluate import _auprc, _auroc, bce, cluster_resamples, fpr_at, recall_at
 from avfuse.member2_data.predictions import ContractError, by_config, join
 
 
@@ -46,15 +46,37 @@ def aligned(manifest, preds, configs, split):
             {c: np.array([r["score_fake"] for r in joined[c]]) for c in configs})
 
 
+FAKE_TYPES = ("audio_fake", "video_fake", "both_fake")
+
+
 def compare(manifest, preds, a: str, b: str, clusters: Mapping[str, str], split: str,
-            threshold: float | None = None, n_boot: int = 1000, seed: int = 0) -> dict:
-    y, ids, _, sc = aligned(manifest, preds, [a, b], split)
+            threshold: float | None = None, n_boot: int = 1000, seed: int = 0, fake_type: str | None = None) -> dict:
+    """Paired b - a on the same clips. fake_type: only that fake type + all real clips (one analysis subset)."""
+    y, ids, t, sc = aligned(manifest, preds, [a, b], split)
+    if fake_type is not None:
+        keep = (t == "real") | (t == fake_type)
+        y, ids, sc = y[keep], [i for i, k in zip(ids, keep) if k], {c: v[keep] for c, v in sc.items()}
     g = np.array([clusters[i] for i in ids])
     fns = {"auroc": _auroc, "auprc": _auprc, "bce": bce}
     if threshold is not None:
         fns["recall"] = lambda yy, ss: recall_at(yy, ss, threshold)
-    return {"a": a, "b": b, "split": split, "n": int(len(y)),
-            "metrics": {k: paired_delta(f, y, sc[a], sc[b], g, n_boot, seed=seed) for k, f in fns.items()}}
+        fns["real_fpr"] = lambda yy, ss: fpr_at(yy, ss, threshold)
+    out = {"a": a, "b": b, "split": split, "n": int(len(y)), "n_real": int((y == 0).sum()), "n_fake": int(y.sum()),
+           "metrics": {k: paired_delta(f, y, sc[a], sc[b], g, n_boot, seed=seed) for k, f in fns.items()}}
+    if fake_type is not None:
+        out["fake_type"] = fake_type
+    return out
+
+
+def compare_by_type(manifest, preds, a: str, b: str, clusters: Mapping[str, str], split: str,
+                    threshold: float | None = None, n_boot: int = 1000, seed: int = 0) -> dict:
+    """The same paired comparison inside each analysis subset: one fake type vs all real clips.
+
+    Whole source groups are resampled with replacement inside the subset (the same
+    cluster bootstrap as overall), so real/fake counts vary from one replicate to the next.
+    """
+    return {ft: compare(manifest, preds, a, b, clusters, split, threshold, n_boot, seed, fake_type=ft)
+            for ft in FAKE_TYPES}
 
 
 def measured_extra_ms(benchmarks: Sequence[Mapping] | None, scope: str = "cached_feature_model") -> dict:

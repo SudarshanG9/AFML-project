@@ -42,3 +42,40 @@ def test_costs_from_mixed_devices_rejected():
          {"config": "reference", "device": "cuda", "scope": "cached_feature_model", "p50_ms": 1}]
     with pytest.raises(ContractError):
         measured_extra_ms(b)
+
+
+def test_by_type_uses_one_fake_type_plus_all_real():
+    from avfuse.member2_data.paired import compare_by_type
+    m = manifest()
+    p = predictions(m)
+    bt = compare_by_type(m, p, "reference", "low_precision", group_clusters(m), "val", 0.5, n_boot=200)
+    assert set(bt) == {"audio_fake", "video_fake", "both_fake"}
+    val = [r for r in m if r["split"] == "val"]
+    n_real = sum(r["manipulation_type"] == "real" for r in val)
+    for ft, c in bt.items():
+        assert c["fake_type"] == ft and c["n_real"] == n_real
+        assert c["n_fake"] == sum(r["manipulation_type"] == ft for r in val)
+        assert set(c["metrics"]) == {"auroc", "auprc", "bce", "recall", "real_fpr"}
+        d = c["metrics"]["bce"]
+        assert d["ci_low"] <= d["delta"] <= d["ci_high"]
+
+
+def test_by_type_point_estimate_matches_manual_subset():
+    from avfuse.member2_data.paired import aligned, compare
+    m = manifest()
+    p = predictions(m)
+    c = compare(m, p, "reference", "restore_value_output", group_clusters(m), "val", 0.5, n_boot=50, fake_type="video_fake")
+    y, ids, t, sc = aligned(m, p, ["reference", "restore_value_output"], "val")
+    k = (t == "real") | (t == "video_fake")
+    assert c["metrics"]["bce"]["delta"] == pytest.approx(bce(y[k], sc["restore_value_output"][k]) - bce(y[k], sc["reference"][k]))
+    # the real-clip FPR is the same set of real clips in every subset
+    assert c["metrics"]["real_fpr"]["a"] == pytest.approx(float((sc["reference"][t == "real"] >= 0.5).mean()))
+
+
+def test_identical_configs_give_zero_in_every_type():
+    from avfuse.member2_data.paired import compare_by_type
+    m = manifest()
+    p = [r for r in predictions(m) if r["config"] == "reference"]
+    twin = [{**r, "config": "low_precision"} for r in p]
+    for c in compare_by_type(m, p + twin, "reference", "low_precision", group_clusters(m), "val", 0.5, n_boot=50).values():
+        assert all(d["delta"] == 0 and not d["excludes_zero"] for d in c["metrics"].values())
