@@ -1,0 +1,29 @@
+{
+  "n_clips": 3200,
+  "n_groups": 2852,
+  "counts": {
+    "val": {
+      "both_fake": 300,
+      "video_fake": 300,
+      "audio_fake": 300,
+      "real": 300
+    },
+    "test": {
+      "both_fake": 500,
+      "video_fake": 500,
+      "audio_fake": 500,
+      "real": 500
+    }
+  },
+  "groups_per_split": {
+    "val": 1114,
+    "test": 1738
+  },
+  "groups_crossing_splits": 0,
+  "clips_in_crossing_groups": 0,
+  "examples": {},
+  "passed": true,
+  "manifest": "manifest_whole.jsonl",
+  "manifest_sha256": "8339b2476a71e62c6c6fca7d937ba4cc7a704b09d26f08506c20d1f10de8f3dd",
+  "grouping": "union of source_id and identity_id (identity_id = source_id; LAV-DF has no speaker IDs)"
+}

@@ -1,0 +1,29 @@
+{
+  "C9_C10_approval": false,
+  "actual_checkpoint_file_sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e",
+  "actual_operator_qkv_file_sha256": "dc126a957281617a771bef29d1baf4e5b798b6cc54f79f3e808ac24c06507a4f",
+  "approved_workloads_matched": true,
+  "approved_workloads_source": "m3_validation_handoff/approved_workloads.json",
+  "benchmark_evidence_hashes_matched": true,
+  "benchmark_evidence_sha256": [
+    "191429abd9005adda2c23babdad5781f3589d2031bf39604c9540143cf29cfd3",
+    "32395daa1da7b4ff3cf5873bfdc37962895797d23a60d732db491107426d17d4",
+    "77b8feff30b52e7db68e680c7bec720c472344291ceee3ff086ba5a1b28539a1"
+  ],
+  "checked_file": "m3_release.json",
+  "executed_at": "2026-11-13T23:51:00+05:30",
+  "expected_context_source": "m3_validation_handoff/B2_execution_context.json",
+  "heldout_test_access": false,
+  "note": "Exact Member 1 validate_owner_release() function executed after recording the actual owner acknowledgement.",
+  "owner": "member3",
+  "owner_acknowledgement_present": true,
+  "owner_identity": "Mirunjai",
+  "release_id": "M3-REL-20261113-01",
+  "runtime_matched": true,
+  "status": "PASS",
+  "validator": {
+    "function": "validate_owner_release",
+    "path": "source/member1_integration/src/avfuse/member1_fusion/dayc_freeze.py",
+    "sha256": "642f4e2a6ae02661d64ef2ae7c843dc336ae7ddabdcdd915a37af3bade80ffc2"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "device": "cpu",
+  "reference_environment": {
+    "python": "3.13.18 (main, Oct 26 2026, 15:28:15) [GCC 13.3.0]",
+    "platform": "Linux-6.6.159+-x86_64-with-glibc2.39",
+    "versions": {
+      "numpy": "2.1.3",
+      "jsonschema": "4.23.0",
+      "torch": "2.14.1+cpu",
+      "scikit-learn": "1.6.1",
+      "matplotlib": "3.10.0",
+      "pytest": "8.3.4"
+    },
+    "device": "cpu",
+    "torch_threads": 1,
+    "torch_interop_threads": 1,
+    "cuda_available": false
+  },
+  "checkpoint_sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e",
+  "validation_count": 1200,
+  "canonical_manifest_sha256": "8339b2476a71e62c6c6fca7d937ba4cc7a704b09d26f08506c20d1f10de8f3dd",
+  "validation_manifest_sha256": "22d1d9e02403cfdbb05f2116da16bc4015f540547a4ac00bf6b7127c119e359c",
+  "precision_claim": "floating-point fake INT8, no integer kernels",
+  "research_status": "G8/G9 technical PASS; final scientific acknowledgement pending; query/test not run"
+}

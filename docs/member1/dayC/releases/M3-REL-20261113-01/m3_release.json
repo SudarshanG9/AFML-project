@@ -1,0 +1,364 @@
+{
+  "record_type": "avfuse_member3_release_acknowledgement",
+  "record_version": "1.0",
+  "release_id": "M3-REL-20261113-01",
+  "status": "ACKNOWLEDGED_WITH_SCOPE_QUALIFICATIONS",
+  "owner": "member3",
+  "external_owner_acknowledgement": true,
+  "acknowledgement_source": "Explicit written approval posted by Mirunjai, the authorised AFML Member 3 owner, in this ChatGPT conversation in response to Sudarshan's 2026-11-13 release-handoff request. The exact owner statement and recording timestamp are preserved in acknowledgement_provenance.json.",
+  "approved_at": "2026-11-13T23:51:00+05:30",
+  "acknowledgement_actor_type": "human_member3_owner",
+  "acknowledgement_actor_identity": "Mirunjai",
+  "human_member3_owner_signature": false,
+  "technical_evidence_decision": "ACCEPTED",
+  "release_scope": "Member 3 benchmark/runtime evidence acceptance and factual scope acknowledgement by the authorised Member 3 owner, Mirunjai. This is not lead C9/C10 policy-freeze approval, permission to access the held-out test split, or a claim of independent Member 3 rerun.",
+  "independent_three_clip_reproduction": {
+    "required_for_this_evidence_acceptance": false,
+    "performed_by_reviewer": false,
+    "reason": "The supplied original evidence already contains a matched, real-checkpoint, three-workload, four-mode benchmark and original real-model execution traces. A fresh reproduction is not required to accept the supplied evidence. The six original feature pairs are not included in this handoff, so no rerun is claimed."
+  },
+  "checkpoint_sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e",
+  "four_modes": [
+    "reference",
+    "low_precision",
+    "restore_value_output",
+    "restore_query"
+  ],
+  "runtime": {
+    "cuda_available": false,
+    "device": "cpu",
+    "platform": "Linux-6.6.159+-x86_64-with-glibc2.39",
+    "python": "3.13.18 (main, Oct 26 2026, 15:28:15) [GCC 13.3.0]",
+    "torch_interop_threads": 1,
+    "torch_threads": 1,
+    "versions": {
+      "jsonschema": "4.26.0",
+      "matplotlib": "3.10.0",
+      "numpy": "2.4.6",
+      "pytest": "8.4.2",
+      "scikit-learn": "1.6.1",
+      "torch": "2.14.1+cpu"
+    }
+  },
+  "device": "cpu",
+  "backend": "sdpa",
+  "batch_size": 1,
+  "warmup": 10,
+  "repeats": 50,
+  "synchronization": "not_required_cpu",
+  "cached_model_scope": "cached_feature_model",
+  "peak_memory_method": "not_measured",
+  "peak_memory_bytes": null,
+  "raw_samples_retained": true,
+  "preprocessing_reported_separately": true,
+  "isolated_operator_scope": "isolated_attention_operator",
+  "conversion_overhead_included": true,
+  "conversion_overhead_ms": null,
+  "conversion_overhead_interpretation": {
+    "release_level_boolean_meaning": "true means every conversion operation applicable to an intervention mode is inside that mode’s timed cached-model call; it does not mean the reference mode performs conversion.",
+    "by_mode": {
+      "reference": false,
+      "low_precision": true,
+      "restore_value_output": true,
+      "restore_query": true
+    },
+    "isolated_conversion_measurement_ms": null,
+    "disposition": "ACCEPTED",
+    "qualification": "No standalone conversion-only duration is supplied. Keep conversion_overhead_ms null. Fake INT8 uses floating-point tensors and is not an integer-kernel or INT8 hardware-speedup result.",
+    "basis": "The raw benchmark rows explicitly mark reference false and all three intervention modes true; conversion executes within the timed model call for those intervention modes."
+  },
+  "approved_workloads": [
+    {
+      "role": "short",
+      "clip_id": "6d8daea9cc33fe63",
+      "video_tokens": 78,
+      "audio_tokens": 80,
+      "valid_tokens": 78,
+      "feature_path": "/content/drive/.shortcut-targets-by-id/1yKf-S0Yyi8ZU7uLx6JbYKZpL95Kn3Mb7/dimodif_emb/val/6d8daea9cc33fe63/features.npz",
+      "feature_sha256": "eb5c3a70164cc56b15cc6247dcc6612689d221835fb29abedb510e53b0674332"
+    },
+    {
+      "role": "typical_anchor",
+      "clip_id": "7cea6ad75b4ebf41",
+      "video_tokens": 192,
+      "audio_tokens": 192,
+      "valid_tokens": 192,
+      "feature_path": "/content/drive/.shortcut-targets-by-id/1yKf-S0Yyi8ZU7uLx6JbYKZpL95Kn3Mb7/dimodif_emb/val/7cea6ad75b4ebf41/features.npz",
+      "feature_sha256": "5bf79b6b61f94989e07183c80a4527986edb06f7198920f87307fee75497865f"
+    },
+    {
+      "role": "long",
+      "clip_id": "891214bf9e5f17d0",
+      "video_tokens": 493,
+      "audio_tokens": 494,
+      "valid_tokens": 493,
+      "feature_path": "/content/drive/.shortcut-targets-by-id/1yKf-S0Yyi8ZU7uLx6JbYKZpL95Kn3Mb7/dimodif_emb/val/891214bf9e5f17d0/features.npz",
+      "feature_sha256": "7e2fac73ba17b07d1333d95b754262519fb30762e8809c0d9030a24bbc88146d"
+    }
+  ],
+  "benchmark_evidence_sha256": [
+    "191429abd9005adda2c23babdad5781f3589d2031bf39604c9540143cf29cfd3",
+    "32395daa1da7b4ff3cf5873bfdc37962895797d23a60d732db491107426d17d4",
+    "77b8feff30b52e7db68e680c7bec720c472344291ceee3ff086ba5a1b28539a1"
+  ],
+  "benchmark_evidence": {
+    "record_count": 12,
+    "measured_sample_count": 600,
+    "per_mode_repetitions_per_workload": 50,
+    "warmups_per_mode_per_workload": 10,
+    "workloads": {
+      "long": {
+        "reference": {
+          "p50_ms": 121.195739,
+          "p95_ms": 133.34547465,
+          "mean_ms": 122.52673224,
+          "coefficient_of_variation_percent": 3.79,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": false,
+          "conversion_overhead_ms": null
+        },
+        "low_precision": {
+          "p50_ms": 158.257662,
+          "p95_ms": 198.10919285,
+          "mean_ms": 156.64070436,
+          "coefficient_of_variation_percent": 19.82,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        },
+        "restore_value_output": {
+          "p50_ms": 121.53076999999999,
+          "p95_ms": 136.9090033,
+          "mean_ms": 123.76449406,
+          "coefficient_of_variation_percent": 5.45,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        },
+        "restore_query": {
+          "p50_ms": 157.677357,
+          "p95_ms": 200.42444329999998,
+          "mean_ms": 155.62428864,
+          "coefficient_of_variation_percent": 20.64,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        }
+      },
+      "short": {
+        "reference": {
+          "p50_ms": 115.841651,
+          "p95_ms": 180.203788,
+          "mean_ms": 128.49833194,
+          "coefficient_of_variation_percent": 19.12,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": false,
+          "conversion_overhead_ms": null
+        },
+        "low_precision": {
+          "p50_ms": 120.460469,
+          "p95_ms": 196.0725363,
+          "mean_ms": 140.69256672,
+          "coefficient_of_variation_percent": 21.34,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        },
+        "restore_value_output": {
+          "p50_ms": 117.8820375,
+          "p95_ms": 133.9671477,
+          "mean_ms": 119.68950416,
+          "coefficient_of_variation_percent": 4.77,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        },
+        "restore_query": {
+          "p50_ms": 171.2283415,
+          "p95_ms": 192.26356185,
+          "mean_ms": 152.53657342,
+          "coefficient_of_variation_percent": 20.01,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        }
+      },
+      "typical_anchor": {
+        "reference": {
+          "p50_ms": 118.4543895,
+          "p95_ms": 139.77561435,
+          "mean_ms": 122.95148948,
+          "coefficient_of_variation_percent": 10.12,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": false,
+          "conversion_overhead_ms": null
+        },
+        "low_precision": {
+          "p50_ms": 161.434481,
+          "p95_ms": 189.4165556,
+          "mean_ms": 153.36505266,
+          "coefficient_of_variation_percent": 20.27,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        },
+        "restore_value_output": {
+          "p50_ms": 119.91815,
+          "p95_ms": 131.85052159999998,
+          "mean_ms": 121.2004398,
+          "coefficient_of_variation_percent": 3.7,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        },
+        "restore_query": {
+          "p50_ms": 167.4740195,
+          "p95_ms": 188.49606695,
+          "mean_ms": 153.73554704,
+          "coefficient_of_variation_percent": 19.32,
+          "timed_samples": 50,
+          "warmup": 10,
+          "conversion_overhead_included_in_latency": true,
+          "conversion_overhead_ms": null
+        }
+      }
+    },
+    "cost_interpretation": "The workload-relative p50 deltas vary materially; restore_query relative to low_precision is approximately +50.77 ms (short), +6.04 ms (typical), and -0.58 ms (long). Do not claim a stable equal-cost or cost-normalized advantage. Raw samples are retained; several intervention timing CVs are approximately 19–21%."
+  },
+  "operator_evidence": {
+    "scope": "isolated_attention_operator",
+    "separate_from_cached_model_benchmark": true,
+    "evidence_files": [
+      {
+        "path": "operator/dayB_attention_reference_lowp.json",
+        "sha256": "7da27ba6b157b92cc74041326067932258062fc5c6c144af9a6b3211b1ca3a2d",
+        "records": 4,
+        "measured_samples": 200,
+        "repeats_per_record": 50
+      },
+      {
+        "path": "operator/dayB_operator_raw_diagnostics.json",
+        "sha256": "81f3ec2b229bcf6dbc46207f23f5a05c0eb30141eefa4dc9cf6b51da11cb829f",
+        "records": 6,
+        "measured_samples": 300,
+        "repeats_per_record": 50
+      },
+      {
+        "path": "operator/operator_sweep.json",
+        "sha256": "ffde4f7e666dda39b3c9e403035e3561f5bf7171cf8108527664138f177867c3",
+        "records": 8,
+        "measured_samples": 40,
+        "repeats_per_record": 5,
+        "warmups_per_record": 2
+      }
+    ],
+    "input_qkv_sha256": "dc126a957281617a771bef29d1baf4e5b798b6cc54f79f3e808ac24c06507a4f",
+    "operator_handoff_sha256": "0d531f6008e2fc68c128d3c5e2c3bd52dd54e1c28fe6b68d9aaeedeafb97709e",
+    "qualification": "These are operator-only timings on pre-built Q/K/V and attention inputs. They exclude projections, the full cached-model path, detection head, raw preprocessing, data loading, file I/O and host/device transfers. Preserve per-record backend, precision, runtime, warmup and repeat metadata; do not pool or compare dissimilar records as one matched experiment. Shapes are caller-declared from the original DiMoDif layer-0 capture; the naive dense score-matrix byte figure is an estimate, not measured fused-SDPA allocation."
+  },
+  "preprocessing_reporting": {
+    "disposition": "ACCEPTED_AS_SEPARATE_PARTIAL_STAGE_PROFILE",
+    "separate_from_cached_model_latency": true,
+    "source_path": "FEATURE_CACHE_RESULTS.md",
+    "source_sha256": "2f2e1160a82f668ab1b2e108e570e7cf8582112ebffad531289b5528a82eff2b",
+    "stage_medians_ms": {
+      "cpu_face_landmarks": 1690,
+      "cpu_video_load_and_mouth_crop": 342,
+      "cpu_audio_load": 7,
+      "gpu_video_encode": 100,
+      "gpu_audio_encode": 64
+    },
+    "qualification": "Historical measurements from a mixed CPU/T4 extraction environment (Python 3.10.22 / PyTorch 2.5.1+cu121). These are separate stage medians, not a measured end-to-end percentile; their sum must not be presented as observed end-to-end latency. Transfer, orchestration and complete raw-media pipeline timing are not established."
+  },
+  "original_real_model_execution_evidence": {
+    "production_path": "scripts/dayB_model_benchmark.py -> DiMoDifAdapter.predict_from_cached_features -> original five-layer SDPA intervention; Member 3 benchmark_callable supplies the timing harness.",
+    "source_code_hashes_path": "original_proof/source_code_hashes.json",
+    "source_code_hashes_sha256": "119f0f0e142ab8842ccffd915b8b6687c77afed53ef467315f406372e5a40c39",
+    "query_pilot_trace_sha256": "d4138ae23cf8b3291847a0f8ff9fcbfb898b7da1cb6739fe4dc9266dccae990b",
+    "validation_completion_sha256": "f6920429e0e2351ff22945d71c55dad49fe8da2acc16633c8f6dfd424fa85ae9",
+    "reference_parity": "Original one-clip native/instrumented reference equality recorded with zero score difference and cleanup success.",
+    "intervention_trace": "Original pilot records all three intervention traces across five DiMoDif attention layers.",
+    "validation_run": "Original restore_query validation output records 1,200/1,200 validation clips completed, 300 per category; test split not accessed.",
+    "diagnostic_cli_disclosure": "The Member 3 diagnostic CLI remains synthetic-only and is not relied on as real-model execution evidence."
+  },
+  "historical_metadata_addendum": {
+    "path": "member3_release_metadata_addendum.json",
+    "sha256": "a9c50203be0b2023380422752059e6c236cf13afc182e52ef36744cd18586fa6",
+    "source_status": "DRAFT_NOT_ACKNOWLEDGED",
+    "historical_authenticity": "Current bytes verified against this handoff inventory; no prior trusted hash was supplied, so historical authenticity is not independently established.",
+    "review_disposition": "Its per-mode conversion declaration is accepted because it matches the raw benchmark records. Null draft fields are not treated as approval; this release resolves the scope fields independently."
+  },
+  "limitations": [
+    "Evidence is original Member 1 execution evidence and original Member 3 measurement-harness output; reviewer did not execute the model or reproduce timings.",
+    "The six original validation feature/meta file pairs are not included in this handoff; their clip identities and hashes are in the approved allowlist and benchmark attempt records.",
+    "CPU-only measurement; no GPU/MPS model performance claim.",
+    "CPU peak memory is unmeasured and must remain null.",
+    "Fake INT8 is simulated in floating point; no real INT8 storage/kernel or hardware speedup claim.",
+    "Cost-normalization reliability is not approved; no equal-cost comparison or stable query-restoration cost advantage is accepted.",
+    "Operator-only and cached-feature-model timings are separate measurement scopes.",
+    "Preprocessing values are historical partial stage medians, not an end-to-end latency measurement.",
+    "No held-out test model inference or test-access authorization is granted by this Member 3 evidence acknowledgement."
+  ],
+  "not_authorized": [
+    "C9/C10 policy freeze or lead scientific acceptance",
+    "Any held-out test feature or label access",
+    "Any new full-validation or test run",
+    "Claims of GPU/MPS performance, real INT8 acceleration, CPU peak memory, end-to-end latency, or reliable equal-cost benefit"
+  ],
+  "evidence_package": {
+    "filename": "AFML_MEMBER3_PRIVATE_HANDOFF_20261113.zip",
+    "sha256": "60a31cda3fe37dc03e42d1d122682cd4c325a8d71552591f6e8700e5a7b73dab",
+    "sha256sum_entries_verified": 27,
+    "all_sha256sum_entries_match": true,
+    "checkpoint_sha256": "e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e"
+  },
+  "member1_validator_contract": {
+    "path": "src/avfuse/member1_fusion/dayc_freeze.py::validate_owner_release",
+    "required_member3_fields_populated": true,
+    "runtime_matches_original_C8A_amended_runtime": true,
+    "approved_workloads_bound_to_original_benchmark_attempt_records": true,
+    "benchmark_evidence_hashes_bound_to_original_files": true,
+    "qualification": "The record populates the fields checked by the current Member 1 member3-owner validator. The acknowledgement actor is explicitly identified as GPT-6; human_member3_owner_signature is false, so do not describe this as a human Member 3 signature."
+  },
+  "owner_identity": "Mirunjai",
+  "human_member3_owner_acknowledgement": true,
+  "owner_acknowledgement": {
+    "status": "EXPLICITLY_ACKNOWLEDGED",
+    "owner_identity": "Mirunjai",
+    "owner_role": "authorised AFML Member 3 owner",
+    "acknowledged_release_id": "M3-REL-20261113-01",
+    "acknowledged_at": "2026-11-13T23:51:00+05:30",
+    "timezone": "Asia/Kolkata",
+    "source": "written owner message in this ChatGPT conversation",
+    "scope": [
+      "existing benchmark/runtime evidence and evidence hashes",
+      "conversion-overhead interpretation",
+      "isolated operator scope",
+      "separate preprocessing reporting",
+      "stated scientific limitations",
+      "reuse of original Member 1 real-model evidence without claiming independent Member 3 reproduction",
+      "no new experiment or three-clip reproduction required for this evidence acceptance",
+      "CPU-only scope and simulated floating-point INT8",
+      "CPU peak memory unmeasured",
+      "no end-to-end latency claim",
+      "no held-out test access"
+    ],
+    "not_approved": [
+      "C9",
+      "C10",
+      "held-out test access"
+    ],
+    "exact_statement": "I, Mirunjai, am the authorised Member 3 owner for AFML.\n\nI have reviewed and explicitly approve the existing Member 3 release M3-REL-20261113-01, including its original benchmark/runtime evidence, evidence hashes, conversion-overhead interpretation, isolated operator scope, separate preprocessing reporting and stated scientific limitations.\n\nI accept the reuse of the original Member 1 real-model evidence without claiming an independent Member 3 reproduction. I confirm that no new experiment or three-clip reproduction is required for this evidence acceptance.\n\nI acknowledge the CPU-only scope, simulated floating-point INT8, unmeasured CPU peak memory, absence of an end-to-end latency claim, and the restriction on held-out test access.\n\nI authorize this written acknowledgement to be recorded as the genuine external Member 3 owner acknowledgement for this release. This does not constitute C9/C10 approval."
+  }
+}
