@@ -2,56 +2,49 @@
 
 **IO-Aware, Precision-Controlled Audio-Visual Fusion for Deepfake Detection**
 
-> **Status:** repository scaffold and unit-testable research primitives, **NOT** a trained or validated deepfake detector. Before interpreting results, select a real checkpoint, verify its cross-modal fusion boundary, obtain licensed labeled clips, and complete end-to-end integration.
+> **Implementation status:** Member 1's four-mode DiMoDif attention intervention, Member 2's data/evaluation tooling, and Member 3's cached-feature inference/runtime CLI are integrated. This does not mean the held-out research evaluation or final scientific release is complete.
 
 ## Research question
 
-Under source-disjoint, manipulation-stratified evaluation, does simulated INT8-style precision reduction inside a joint audio-visual detector's cross-modal attention change forensic correctness by attack type (audio-fake, video-fake, both-fake)? Can selective value/output-path restoration recover more loss than a query-path restoration control relative to *measured* added cost?
+Under source-disjoint, manipulation-stratified evaluation, does simulated INT8-style precision reduction inside a joint audio-visual detector's self-attention change forensic correctness by attack type (audio-fake, video-fake, both-fake)? Can selective value/output-path restoration recover more loss than a query-path restoration control relative to measured added cost?
 
-## Three member-owned components
+## Three owner components
 
-| Member | Code path | Owns | Produces |
-|---|---|---|---|
-| **Member 1 / Lead** | `src/avfuse/member1_fusion/` | checkpoint adapter, attention oracle/SDPA, numerical interventions, ablations | four model configurations, predictions |
-| **Member 2** | `src/avfuse/member2_data/` | licensed data, source/identity-disjoint splits, caching, forensic evaluation | `manifest.jsonl`, tensor cache, stratified metrics |
-| **Member 3** | `src/avfuse/member3_runtime/` | timing, peak memory, repeatability, orchestration, CLI | benchmark records, environment details, demo |
+| Owner | Code | Responsibility |
+|---|---|---|
+| Member 1 / Lead | src/avfuse/member1_fusion/ | Pretrained DiMoDif adapter, attention interventions, precision modes and diagnostics |
+| Member 2 | src/avfuse/member2_data/ | Dataset manifests, feature cache contracts, split/shortcut audits, prediction checks and evaluation |
+| Member 3 | src/avfuse/member3_runtime/ | Feature loading, inference orchestration, CLI, timing, benchmarking, provenance and run integrity |
 
-Shared schemas are in `contracts/schemas/`; reference decisions and integration gates are in `docs/`.
+Shared schemas are in contracts/schemas/. Member 3 command documentation is in docs/member3/CLI.md; the integrated dashboard is in frontend/README.md.
 
-## Install and run the scaffold
+## Install and test
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate           # on Windows: .venv\Scripts\activate
-python -m pip install -e '.[dev]'
-python scripts/check_environment.py
-pytest -q
-python -m avfuse.member3_runtime.cli --smoke
-```
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -e ".[dev]"
+    python -m pytest -q
+    python -m pip install -r frontend/requirements.txt
+    python -m pytest -q frontend/tests
+    streamlit run frontend/app.py
 
-The **smoke CLI intentionally uses synthetic tensors and a randomly initialized toy fusion head**. Its fake-score outputs are not scientific results. It only confirms module wiring.
+## Real cached-feature execution
 
-## Research outputs (planned; not yet generated)
+The real Member 3 commands are validate-config, run, predict, benchmark and inspect. Choose the checkpoint explicitly and provide the external DiMoDif checkout, whole-video manifest and feature root.
 
-```text
-data/cache/<clip_id>.pt          # encoder tokens or an explicitly documented feature boundary
-artifacts/predictions/*.jsonl   # one line per clip per configuration
-artifacts/benchmarks/*.jsonl    # one line per configuration/device/scope
-artifacts/reports/              # validation/test statistics and intervals
-artifacts/runs/                 # frozen run config + hashes + software/device info
-```
+Feature loader formats:
+- dimodif_npz: <feature-root>/<split>/<clip_id>/features.npz with video_features and audio_features.
+- shared_pt: manifest feature_path to a tensor dictionary containing video_tokens and audio_tokens.
 
-Data, personally sensitive clips, model weights and generated results are excluded from git by default. See `data/README.md`.
+This runtime operates on cached encoder features; it is not raw-video end-to-end inference. The synthetic --smoke CLI is a wiring diagnostic only.
 
-## Ground rules
+## Research integrity boundaries
 
-1. **Model:** lock a real, reproducible checkpoint and audit its training-set overlap with evaluation clips before experiments.
-2. **No fabricated results:** do not treat the synthetic smoke test as forensic evaluation.
-3. **Cache boundary:** when frozen encoder outputs are cached, model-level latency means **cached-feature fusion + head**, not raw-video inference. Separately report raw-media preprocessing and feature-encoding costs.
-4. **Precision:** `fake_quant_int8` numerically emulates symmetric quantization while tensors remain floating point. No claim of real 8-bit kernel speedups.
-5. **Restoration control:** value **and output** restoration may not cost the same as query-only restoration. Compare empirical added cost; never assume equal work.
-6. **Data discipline:** choose the threshold and any precision policy on validation data. Run held-out test scoring only after freeze.
-7. **Evaluation:** for each attack-type AUROC/AUPRC, compare that fake class **against real clips**, not a single-positive-class subset.
-8. **PRs:** changes to `contracts/`, `configs/`, and orchestration need review from all affected owners.
+1. Do not treat fake quantization as a real integer kernel, INT8 speedup or energy result. Tensors remain floating point.
+2. Keep isolated operator, cached-feature model and preprocessing measurements separate.
+3. Do not invent unavailable memory values; null means not measured.
+4. Freeze thresholds and precision policy using validation only. Held-out test remains subject to Member 2 protocol/unseal/purpose controls and C9/C10 owner approvals.
+5. Report source/speaker identity disjointness only to the level established by dataset metadata.
+6. CI success demonstrates software tests, not forensic accuracy, causal conclusions or a research release.
 
-See `docs/ARCHITECTURE.md`, `docs/OWNERSHIP.md`, `docs/CONTRACTS.md`, and `docs/PLAN_12_DAYS.md`.
+See docs/BRANCH_CONSOLIDATION_AUDIT_2026-11-14.md for the branch inventory and merge-resolution record.
