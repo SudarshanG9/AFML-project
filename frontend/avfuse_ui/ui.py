@@ -89,6 +89,25 @@ def parse_uploaded_jsonl_with_error(upload: Any, label: str) -> list[dict[str, A
         return []
 
 
+def choose_many_local_or_upload(root: Path, label: str, paths: list[Path], key: str,
+                                 file_types: list[str]) -> tuple[list[Path], list[Any] | None]:
+    """Select multiple local artifacts or upload multiple files for this session only."""
+    col1, col2 = st.columns([1.25, 1])
+    with col1:
+        options = [str(p.relative_to(root)) if p.is_relative_to(root) else str(p) for p in paths]
+        chosen = st.multiselect(f"Local {label}", options, key=f"{key}_local_many")
+    with col2:
+        uploaded = st.file_uploader(
+            f"Or import {label}", type=file_types, accept_multiple_files=True,
+            key=f"{key}_upload_many",
+        )
+    selected_paths = [
+        p for p in paths
+        if (str(p.relative_to(root)) if p.is_relative_to(root) else str(p)) in chosen
+    ]
+    return selected_paths, (uploaded or None)
+
+
 def choose_local_or_upload(root: Path, label: str, paths: list[Path], key: str,
                             file_types: list[str]) -> tuple[Path | None, Any | None]:
     col1, col2 = st.columns([1.25, 1])
