@@ -419,6 +419,41 @@ def documented_test_results(markdown: str) -> dict[str, Any]:
     }
 
 
+def documented_benchmark_summary(markdown: str) -> dict[str, Any] | None:
+    """Parse only the compact typical-workload benchmark figures stated in the Day 9 report."""
+    match = re.search(
+        r"Verified typical p50 ms:\s*"
+        r"reference\s+([0-9.]+);\s*"
+        r"low_precision\s+([0-9.]+);\s*"
+        r"restore_value_output\s+([0-9.]+);\s*"
+        r"restore_query\s+([0-9.]+)",
+        markdown,
+    )
+    if not match:
+        return None
+    p50 = {
+        config: float(value)
+        for config, value in zip(CONFIGS, match.groups())
+    }
+    value_match = re.search(r"Typical E_value\s*=\s*([+\-−]?[0-9.]+)\s*ms", markdown)
+    query_match = re.search(r"Typical E_query\s*=\s*([+\-−]?[0-9.]+)\s*ms", markdown)
+
+    def parse_signed(value: str) -> float:
+        return float(value.replace("−", "-"))
+
+    return {
+        "workload": "typical",
+        "scope": "cached_feature_model",
+        "device": "cpu",
+        "backend": "sdpa",
+        "p50_ms": p50,
+        "extra_cost_ms": {
+            "value_output_vs_low_precision": parse_signed(value_match.group(1)) if value_match else None,
+            "query_vs_low_precision": parse_signed(query_match.group(1)) if query_match else None,
+        },
+    }
+
+
 def documented_shortcut_table(markdown: str) -> list[dict[str, Any]]:
     """Parse the repository's committed whole-video shortcut summary, not raw audit JSON."""
     rows: list[dict[str, Any]] = []
