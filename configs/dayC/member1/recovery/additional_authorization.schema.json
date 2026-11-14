@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Actual human C10 incident-linked one-additional-attempt receipt",
+  "type": "object",
+  "required": [
+    "gate",
+    "ack_text",
+    "context_sha256",
+    "execution_package_sha256",
+    "execution_package_manifest_sha256",
+    "approved_at",
+    "user_supplied",
+    "acknowledgement_source",
+    "approval_kind",
+    "parent_run_id",
+    "recovery_run_id",
+    "max_additional_attempts",
+    "parent_evidence_sha256",
+    "previous_recovery_evidence_sha256",
+    "prior_failed_attempts_acknowledged",
+    "overall_attempt_limit",
+    "manual_interruption_acknowledged"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "gate": {
+      "const": "C10"
+    },
+    "ack_text": {
+      "const": "ACK DAYC C10: AUTHORIZE ONE FOUR-MODE HELD-OUT TEST RUN"
+    },
+    "context_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "execution_package_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "execution_package_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "approved_at": {
+      "type": "string"
+    },
+    "user_supplied": {
+      "const": true
+    },
+    "acknowledgement_source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approval_kind": {
+      "const": "C10_INCIDENT_ADDITIONAL_RECOVERY"
+    },
+    "parent_run_id": {
+      "type": "string"
+    },
+    "recovery_run_id": {
+      "type": "string"
+    },
+    "max_additional_attempts": {
+      "type": "integer",
+      "const": 1
+    },
+    "parent_evidence_sha256": {
+      "type": "object",
+      "required": [
+        "archive",
+        "lock",
+        "ledger",
+        "policy",
+        "run",
+        "anchor",
+        "package",
+        "approval"
+      ],
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "previous_recovery_evidence_sha256": {
+      "type": "object",
+      "required": [
+        "archive",
+        "lock",
+        "ledger",
+        "context",
+        "anchor",
+        "package",
+        "approval"
+      ],
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "prior_failed_attempts_acknowledged": {
+      "const": 2,
+      "type": "integer"
+    },
+    "overall_attempt_limit": {
+      "const": 3,
+      "type": "integer"
+    },
+    "manual_interruption_acknowledged": {
+      "const": true
+    }
+  }
+}
