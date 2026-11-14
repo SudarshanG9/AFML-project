@@ -20,12 +20,12 @@ from pathlib import Path
 
 import numpy as np
 
-from avfuse.member2_data.paired import compare
+from avfuse.member2_data.paired import compare, compare_by_type
 from avfuse.member2_data.evaluate import evaluate_config, threshold_at_fpr
 from avfuse.member2_data.manifest import read_manifest
 from avfuse.member2_data.predictions import ContractError, by_config, join, read_predictions
 from avfuse.member2_data.seal import SealedTestError, accesses, open_test
-from avfuse.member2_data.report import config_markdown, paired_markdown, plot_curves, plot_recall_by_type, save_json, sha256_file
+from avfuse.member2_data.report import config_markdown, paired_by_type_markdown, paired_markdown, plot_curves, plot_recall_by_type, save_json, sha256_file
 from avfuse.member2_data.splits import group_clusters
 from avfuse.shared.contracts import PRECISION_MODES
 
@@ -83,8 +83,22 @@ def cmd_evaluate(a, manifest, preds):
             print(f"  {c['b']} - {c['a']}  {k:6s} {d['delta']:+.4f} [{d['ci_low']:+.4f}, {d['ci_high']:+.4f}]"
                   f"{'  *' if d['excludes_zero'] else ''}")
         md.append(paired_markdown(c))
+    # The same contrasts inside each analysis subset (one fake type vs all real).
+    paired_by_type = []
+    for x, y in pairs:
+        bt = compare_by_type(manifest, preds, x, y, clusters, a.split, thr, a.n_boot, a.seed)
+        paired_by_type.append({"a": x, "b": y, "by_type": bt})
+        md.append(paired_by_type_markdown(bt))
+        for ft, c in bt.items():
+            flags = [k for k, d in c["metrics"].items() if d["excludes_zero"]]
+            print(f"  {y} - {x}  [{ft}] bce {c['metrics']['bce']['delta']:+.4f} "
+                  f"[{c['metrics']['bce']['ci_low']:+.4f}, {c['metrics']['bce']['ci_high']:+.4f}]"
+                  f"{'  CI excludes 0: ' + ', '.join(flags) if flags else ''}")
     out = Path(a.out)
-    save_json({"split": a.split, "paired": paired, "threshold": thr,
+    save_json({"split": a.split, "paired": paired, "paired_by_type": paired_by_type,
+               "paired_by_type_method": "analysis subsets (each fake type + all real); whole source groups resampled "
+                                        "with replacement inside the subset; same n_boot and seed",
+               "threshold": thr,
                "test_accesses_so_far": len(accesses(a.protocol)) if a.protocol else 0, "n_boot": a.n_boot, "seed": a.seed,
                "manifest_sha256": sha256_file(a.manifest), "configs": results}, out / "metrics.json")
     (out / "summary.md").write_text(f"# Forensic evaluation ({a.split})\n\n" + "\n".join(md))
