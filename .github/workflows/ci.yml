@@ -49,7 +49,9 @@ jobs:
             --ignore=tests/member1/test_dayc_colab_pilot.py \
             --ignore=tests/member1/test_dayc_execution_package.py
       - name: Frontend tests
-        # Root pytest.ini only discovers tests/, so the frontend suite must be invoked explicitly.
+        # Root pytest config discovers tests/ only; expose the frontend package explicitly.
+        env:
+          PYTHONPATH: frontend:src
         run: python -m pytest -q frontend/tests
       - name: Compile frontend modules
         run: python -m compileall -q frontend/avfuse_ui frontend/app.py
