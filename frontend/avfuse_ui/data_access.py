@@ -306,6 +306,154 @@ def documented_validation_table(markdown: str) -> list[dict[str, Any]]:
     return rows
 
 
+def documented_test_results(markdown: str) -> dict[str, Any]:
+    """Parse Member 2's published TEST_RESULTS.md summary without treating it as a fresh evaluation."""
+    rows: list[dict[str, Any]] = []
+    mode_pattern = re.compile(
+        r"^\|\s*(reference|low_precision|restore_value_output|restore_query)\s*\|"
+        r"\s*([0-9.]+)\s*\[\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\]\s*\|"
+        r"\s*([0-9.]+)\s*\|\s*([0-9.]+)\s*\|\s*([0-9.]+)\s*\|\s*([0-9.]+)\s*\|$"
+    )
+    for line in markdown.splitlines():
+        match = mode_pattern.match(line.strip())
+        if not match:
+            continue
+        rows.append({
+            "config": match.group(1),
+            "auroc": float(match.group(2)),
+            "auroc_ci_low": float(match.group(3)),
+            "auroc_ci_high": float(match.group(4)),
+            "auprc": float(match.group(5)),
+            "bce": float(match.group(6)),
+            "recall": float(match.group(7)),
+            "real_fpr": float(match.group(8)),
+        })
+
+    metadata: dict[str, Any] = {}
+    tick = r"\x60"
+    run_match = re.search(r"Predictions:.*?run\s+" + tick + r"([^" + tick + r"]+)" + tick, markdown)
+    if run_match:
+        metadata["run_id"] = run_match.group(1)
+    manifest_match = re.search(
+        r"Manifest:\s*" + tick + r"([^" + tick + r"]+)" + tick + r"\s*\(sha\s+" + tick + r"([^" + tick + r"]+)" + tick + r"\)",
+        markdown,
+    )
+    if manifest_match:
+        metadata["manifest_name"] = manifest_match.group(1)
+        metadata["manifest_sha_prefix"] = manifest_match.group(2)
+    threshold_match = re.search(r"Threshold:\s*([0-9.]+)", markdown)
+    if threshold_match:
+        metadata["threshold"] = float(threshold_match.group(1))
+    cohort_match = re.search(
+        tick + r"split == test" + tick + r":\s*([\d,]+)\s+real,\s*([\d,]+)\s+audio_fake,\s*"
+        r"([\d,]+)\s+video_fake,\s*([\d,]+)\s+both_fake,\s*([\d,]+)\s+source groups",
+        markdown,
+    )
+    if cohort_match:
+        counts = [int(value.replace(",", "")) for value in cohort_match.groups()]
+        metadata["split_counts"] = dict(zip(("real", "audio_fake", "video_fake", "both_fake"), counts[:4]))
+        metadata["total_test_videos"] = sum(counts[:4])
+        metadata["source_groups"] = counts[4]
+    bootstrap_match = re.search(r"Bootstrap:\s*([\d,]+)\s+resamples,\s*seed\s+(\d+)", markdown)
+    if bootstrap_match:
+        metadata["bootstrap_resamples"] = int(bootstrap_match.group(1).replace(",", ""))
+        metadata["bootstrap_seed"] = int(bootstrap_match.group(2))
+    seal_match = re.search(r"Test seal:\s*opened once on\s+(\d{4}-\d{2}-\d{2})", markdown)
+    if seal_match:
+        metadata["test_opened_date"] = seal_match.group(1)
+    ledger_match = re.search(r"ledger has\s+(\d+)\s+lines", markdown)
+    if ledger_match:
+        metadata["ledger_lines"] = int(ledger_match.group(1))
+    attempts_match = re.search(r"inference took\s+(\d+)\s+attempts", markdown)
+    if attempts_match:
+        metadata["inference_attempts"] = int(attempts_match.group(1))
+
+    per_type: list[dict[str, Any]] = []
+    in_per_type = False
+    for line in markdown.splitlines():
+        if "Reference, per fake type vs real:" in line:
+            in_per_type = True
+            continue
+        if in_per_type and not line.strip():
+            break
+        if in_per_type:
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            if len(cells) == 3 and cells[0] in FAKE_TYPES:
+                try:
+                    per_type.append({
+                        "manipulation_type": cells[0],
+                        "auroc": float(cells[1]),
+                        "recall": float(cells[2]),
+                    })
+                except ValueError:
+                    continue
+
+    paired_bce: list[dict[str, Any]] = []
+    in_paired = False
+    paired_pattern = re.compile(
+        r"^-\s*([a-z_]+)\s+vs\s+([a-z_]+):\s*([+-]?[0-9.]+)\s*"
+        r"\[\s*([+-]?[0-9.]+)\s*,\s*([+-]?[0-9.]+)\s*\]$"
+    )
+    for line in markdown.splitlines():
+        if line.strip() == "Paired BCE differences (same videos):":
+            in_paired = True
+            continue
+        if in_paired and not line.strip().startswith("- "):
+            if paired_bce:
+                break
+        if in_paired:
+            match = paired_pattern.match(line.strip())
+            if match:
+                paired_bce.append({
+                    "contrast": f"{match.group(1)} vs {match.group(2)}",
+                    "delta_bce": float(match.group(3)),
+                    "ci_low": float(match.group(4)),
+                    "ci_high": float(match.group(5)),
+                })
+
+    return {
+        "rows": rows,
+        "metadata": metadata,
+        "per_type": per_type,
+        "paired_bce": paired_bce,
+    }
+
+
+def documented_benchmark_summary(markdown: str) -> dict[str, Any] | None:
+    """Parse only the compact typical-workload benchmark figures stated in the Day 9 report."""
+    match = re.search(
+        r"Verified typical p50 ms:\s*"
+        r"reference\s+([0-9.]+);\s*"
+        r"low_precision\s+([0-9.]+);\s*"
+        r"restore_value_output\s+([0-9.]+);\s*"
+        r"restore_query\s+([0-9.]+)",
+        markdown,
+    )
+    if not match:
+        return None
+    p50 = {
+        config: float(value)
+        for config, value in zip(CONFIGS, match.groups())
+    }
+    value_match = re.search(r"Typical E_value\s*=\s*([+\-−]?[0-9.]+)\s*ms", markdown)
+    query_match = re.search(r"Typical E_query\s*=\s*([+\-−]?[0-9.]+)\s*ms", markdown)
+
+    def parse_signed(value: str) -> float:
+        return float(value.replace("−", "-"))
+
+    return {
+        "workload": "typical",
+        "scope": "cached_feature_model",
+        "device": "cpu",
+        "backend": "sdpa",
+        "p50_ms": p50,
+        "extra_cost_ms": {
+            "value_output_vs_low_precision": parse_signed(value_match.group(1)) if value_match else None,
+            "query_vs_low_precision": parse_signed(query_match.group(1)) if query_match else None,
+        },
+    }
+
+
 def documented_shortcut_table(markdown: str) -> list[dict[str, Any]]:
     """Parse the repository's committed whole-video shortcut summary, not raw audit JSON."""
     rows: list[dict[str, Any]] = []

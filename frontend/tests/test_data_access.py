@@ -11,6 +11,8 @@ import torch
 from avfuse_ui.data_access import (
     documented_shortcut_table,
     documented_validation_table,
+    documented_test_results,
+    documented_benchmark_summary,
     discover_files,
     feature_file_summary_bytes,
     parse_jsonl_text,
@@ -128,3 +130,61 @@ def test_discovery_finds_nested_manifest_and_member3_run_layout(tmp_path: Path) 
     assert run / "predictions.jsonl" in found["predictions"]
     assert run / "benchmark_records.jsonl" in found["benchmarks"]
     assert run / "stage_profile.json" in found["stage_profiles"]
+
+
+def test_documented_test_results_parse_published_heldout_report() -> None:
+    report = '''
+- Predictions: Member 1's run `C10_RECOVERY_R2`, 4 modes x 2,000 test videos.
+- Manifest: `manifest_whole.jsonl` (sha `8339b247...`), `split == test`: 500 real, 500 audio_fake, 500 video_fake, 500 both_fake, 1,738 source groups.
+- Threshold: 0.6627789735794068, frozen on val (protocol sha `358c0372...`).
+- Bootstrap: 1,000 resamples, seed 0, whole source groups.
+- Test seal: opened once on 2026-11-14 (ledger has 2 lines from the same session: the evaluation, then the trailing-silence control).
+Member 1's inference took 3 attempts.
+| Mode | AUROC [95% CI] | AUPRC | BCE | Recall | Real FPR |
+|---|---|---|---|---|---|
+| reference | 0.9980 [0.9969, 0.9989] | 0.9994 | 0.0678 | 0.992 | 0.042 |
+| low_precision | 0.9980 [0.9969, 0.9989] | 0.9993 | 0.0681 | 0.992 | 0.042 |
+| restore_value_output | 0.9980 [0.9969, 0.9989] | 0.9993 | 0.0682 | 0.992 | 0.042 |
+| restore_query | 0.9980 [0.9969, 0.9989] | 0.9994 | 0.0677 | 0.992 | 0.042 |
+
+Reference, per fake type vs real:
+| Fake type | AUROC | Recall |
+|---|---|---|
+| audio_fake | 0.9990 | 0.994 |
+| video_fake | 0.9955 | 0.984 |
+| both_fake | 0.9996 | 0.998 |
+
+Paired BCE differences (same videos):
+- low_precision vs reference: +0.0003 [-0.0002, +0.0010]
+- restore_value_output vs low_precision: +0.0001 [-0.0004, +0.0005]
+- restore_query vs low_precision: -0.0004 [-0.0010, +0.0001]
+- restore_value_output vs restore_query: +0.0005 [-0.0002, +0.0012]
+'''
+    parsed = documented_test_results(report)
+    assert len(parsed['rows']) == 4
+    assert parsed['rows'][0]['auroc'] == pytest.approx(0.9980)
+    assert parsed['rows'][0]['auroc_ci_low'] == pytest.approx(0.9969)
+    assert parsed['metadata']['run_id'] == 'C10_RECOVERY_R2'
+    assert parsed['metadata']['total_test_videos'] == 2000
+    assert parsed['metadata']['source_groups'] == 1738
+    assert parsed['metadata']['threshold'] == pytest.approx(0.6627789735794068)
+    assert len(parsed['per_type']) == 3
+    assert len(parsed['paired_bce']) == 4
+
+
+
+def test_documented_benchmark_summary_parses_reported_typical_p50() -> None:
+    report = """Verified typical p50 ms: reference 4.20; low_precision 4.15; restore_value_output 4.24; restore_query 4.18
+Typical E_value = +0.09 ms
+Typical E_query = −0.03 ms
+"""
+    parsed = documented_benchmark_summary(report)
+    assert parsed is not None
+    assert parsed["scope"] == "cached_feature_model"
+    assert parsed["p50_ms"]["reference"] == pytest.approx(4.20)
+    assert parsed["extra_cost_ms"]["value_output_vs_low_precision"] == pytest.approx(0.09)
+    assert parsed["extra_cost_ms"]["query_vs_low_precision"] == pytest.approx(-0.03)
+
+
+def test_documented_benchmark_summary_ignores_unrecognized_report() -> None:
+    assert documented_benchmark_summary("No benchmark data here") is None

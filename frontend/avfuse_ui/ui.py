@@ -9,7 +9,7 @@ import plotly.express as px
 import streamlit as st
 
 from .data_access import (
-    CONFIGS, documented_validation_table,
+    CONFIGS, documented_validation_table, documented_test_results, documented_benchmark_summary,
     human_bytes, load_json, load_jsonl, manifest_summary, parse_jsonl_text,
     prediction_summary, shortcut_audit_summary, feature_file_summary_bytes, documented_shortcut_table,
     validate_benchmarks, validate_manifest, validate_metrics_report, validate_predictions,
@@ -87,6 +87,25 @@ def parse_uploaded_jsonl_with_error(upload: Any, label: str) -> list[dict[str, A
     except Exception as exc:
         st.error(f"Could not parse uploaded {label} `{upload.name}`: {type(exc).__name__}: {exc}")
         return []
+
+
+def choose_many_local_or_upload(root: Path, label: str, paths: list[Path], key: str,
+                                 file_types: list[str]) -> tuple[list[Path], list[Any] | None]:
+    """Select multiple local artifacts or upload multiple files for this session only."""
+    col1, col2 = st.columns([1.25, 1])
+    with col1:
+        options = [str(p.relative_to(root)) if p.is_relative_to(root) else str(p) for p in paths]
+        chosen = st.multiselect(f"Local {label}", options, key=f"{key}_local_many")
+    with col2:
+        uploaded = st.file_uploader(
+            f"Or import {label}", type=file_types, accept_multiple_files=True,
+            key=f"{key}_upload_many",
+        )
+    selected_paths = [
+        p for p in paths
+        if (str(p.relative_to(root)) if p.is_relative_to(root) else str(p)) in chosen
+    ]
+    return selected_paths, (uploaded or None)
 
 
 def choose_local_or_upload(root: Path, label: str, paths: list[Path], key: str,
@@ -619,6 +638,48 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
             source = str(path)
         except Exception as exc:
             st.error(f"Could not read metrics report: {type(exc).__name__}: {exc}")
+    # A committed held-out summary is documentation, not a freshly loaded metrics.json artifact.
+    test_doc = root / "docs/member2/results/TEST_RESULTS.md"
+    if test_doc.is_file():
+        text = test_doc.read_text(encoding="utf-8", errors="replace")
+        documented = documented_test_results(text)
+        if documented["rows"]:
+            meta = documented["metadata"]
+            st.info("Showing Member 2's committed held-out test summary. These are documented results, not a newly computed evaluation or a verified live prediction import.")
+            st.caption(f"Documentation source: {test_doc.relative_to(root)} · Reported prediction run: {meta.get('run_id', 'not stated')}")
+            if meta.get("total_test_videos"):
+                st.write(f"**Reported test cohort:** {meta['total_test_videos']:,} videos · **Source groups:** {meta.get('source_groups', 'not stated'):,}")
+            if meta.get("threshold") is not None:
+                st.write(f"**Validation-frozen threshold:** {meta['threshold']:.6f} · **Bootstrap:** {meta.get('bootstrap_resamples', 'not stated')} resamples, seed {meta.get('bootstrap_seed', 'not stated')}")
+            table = []
+            for row in documented["rows"]:
+                table.append({
+                    "Configuration": CFG_LABELS.get(row["config"], row["config"]),
+                    "AUROC": f"{row['auroc']:.4f} [{row['auroc_ci_low']:.4f}, {row['auroc_ci_high']:.4f}]",
+                    "AUPRC": f"{row['auprc']:.4f}", "BCE": f"{row['bce']:.4f}",
+                    "Recall": f"{row['recall']:.3f}", "Real FPR": f"{row['real_fpr']:.3f}",
+                })
+            panel_title("Published held-out results", "Transcribed from Member 2's checked-in report; AUROC confidence intervals are shown as published.")
+            st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
+            per_type = documented.get("per_type", [])
+            if per_type:
+                panel_title("Reference performance by manipulation type")
+                st.dataframe(pd.DataFrame([{
+                    "Manipulation": row["manipulation_type"].replace("_", " "),
+                    "AUROC": row["auroc"], "Recall": row["recall"],
+                } for row in per_type]), use_container_width=True, hide_index=True)
+            paired = documented.get("paired_bce", [])
+            if paired:
+                panel_title("Paired BCE contrasts", "Intervals crossing zero are inconclusive; they do not establish equivalence.")
+                st.dataframe(pd.DataFrame([{
+                    "Contrast": row["contrast"], "Delta BCE": row["delta_bce"],
+                    "95% CI": f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}]",
+                    "CI excludes zero": row["ci_low"] > 0 or row["ci_high"] < 0,
+                } for row in paired]), use_container_width=True, hide_index=True)
+            st.warning("Report limitations: simulated INT8 uses floating-point arithmetic; no hardware speedup is established. Source groups do not prove speaker independence, duration was not controlled, and test-label-derived summaries were inspected before freeze. The report records three inference attempts, including a failed pre-scoring attempt and a stopped attempt.")
+            with st.expander("Read the complete Member 2 test report"):
+                st.markdown(text)
+            st.caption("For machine-readable paired metrics, import the corresponding structured metrics JSON when available. This documentation view does not synthesize missing confidence intervals or prediction files.")
     if report:
         errors = validate_metrics_report(report)
         split = report.get("split")
@@ -724,6 +785,30 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
     page_header("RUNTIME / MEMBER 3", "Benchmark explorer",
                 "Read the Member 3 benchmark records without conflating operator, cached-feature model, or preprocessing costs.")
     st.markdown("<div class='avf-warn'><b>Precision disclosure:</b> all non-reference configurations are simulated fake quantization in floating-point arithmetic. The runtime records do not measure a real INT8 kernel or prove INT8 hardware speedup.</div>", unsafe_allow_html=True)
+
+    with st.expander("Documented benchmark snapshot (optional report upload)"):
+        report = st.file_uploader(
+            "Upload a Markdown benchmark report",
+            type=["md", "markdown", "txt"],
+            key="documented_benchmark_report",
+        )
+        if report is not None:
+            try:
+                snapshot = documented_benchmark_summary(report.getvalue().decode("utf-8"))
+            except UnicodeDecodeError:
+                snapshot = None
+                st.error("The report must be UTF-8 text.")
+            if snapshot is None:
+                st.info("No recognized typical-workload p50 summary was found. Upload the report containing the 'Verified typical p50 ms' summary.")
+            else:
+                st.caption("Documented snapshot only · not a live benchmark run or a validated benchmark-record artifact.")
+                snapshot_df = pd.DataFrame(
+                    [{"Configuration": config, "p50 (ms)": latency}
+                     for config, latency in snapshot["p50_ms"].items()]
+                )
+                st.dataframe(snapshot_df, use_container_width=True, hide_index=True)
+                st.json({"scope": snapshot["scope"], "device": snapshot["device"],
+                         "backend": snapshot["backend"], "extra_cost_ms": snapshot["extra_cost_ms"]})
     selected_paths, uploads = choose_many_local_or_upload(root, "benchmark JSONL files", files["benchmarks"], "benchmarks", ["jsonl", "txt"])
     rows: list[dict[str, Any]] = []
     source = None
