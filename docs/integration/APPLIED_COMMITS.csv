@@ -1,0 +1,10 @@
+operation,source_commit,applied_commit,description
+reviewed merge,9eb32dec1ecf9a0c901b520bcd7252b8ecb60a8b,686cebc4861b3728df541ee1263dbcc412079b5b,Member 1 lineage; main final Member 2 retained; no conflicts
+cherry-pick -x,18d4af3fa05c9453eafb4666f78f0d5867bc3437,2cf53caf9e062e8b7810e14e8b3f10edef0e8997,Establish verified backend foundation for isolated cleanup workstreams
+cherry-pick -x,e7d0127fd6abb72163b0c55e1c24d8387790eb50,2261dcea53f8c8d4dc8132493dc494e1fc6f93c1,Clarify fusion module roles and private historical test requirements
+cherry-pick -x,84042f613ad7b607c6e29abd2b7b3dd1a0393918,349e08c0f364f4b121a63a13328f9808612e9327,Explain canonical whole-video data and final evaluator workflow
+cherry-pick -x,e863a2d4ee55b73c4e262a7a753c6ad3da8a37e0,3e1b315e1378a76a25d22f1e916a061e18a59890,Document current four-mode runtime and precise benchmark boundaries
+cherry-pick -x,4c1578c0276120ebd155a8ce7236d37103c26927,ec2d2e2a02fcea9de6e320ea83b4c5372e13e36d,Exclude generated metadata and licensed pilot media from release tree
+cherry-pick -x,c252c014865c504f1f962bf954a4c9b8267fea70,1f1b7dc9b487d9a798b423c418a5601faf99b74d,Use portable LF line endings in removal inventory
+cherry-pick -x,9377e58978b5ac926430225050ae05e8e4c70032,2ef56ba64f9dd8756b8b971a85c9479824de7d7c,Author complete AVFuse-CausalQ research book with verified original results
+new integration documentation,,9310ec4fe0a9c28c8c985dcecf11d49f25aa26b2,Add current authority index and backend-only scope notice

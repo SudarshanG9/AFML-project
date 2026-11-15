@@ -1,0 +1,21 @@
+{
+  "n_train_videos": 78703,
+  "n_train_sources": 21254,
+  "splits": {
+    "test": {
+      "n_videos": 2000,
+      "n_sources": 1738,
+      "videos_whose_source_is_in_train": 0,
+      "by_type": {},
+      "examples": []
+    },
+    "val": {
+      "n_videos": 1200,
+      "n_sources": 1114,
+      "videos_whose_source_is_in_train": 0,
+      "by_type": {},
+      "examples": []
+    }
+  },
+  "clean": true
+}
