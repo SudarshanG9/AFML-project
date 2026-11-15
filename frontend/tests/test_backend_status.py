@@ -15,7 +15,7 @@ def test_detect_repo_root_finds_checkout_ancestor(tmp_path: Path) -> None:
 def test_missing_source_does_not_imply_readiness(tmp_path):
     status = inspect_backend(tmp_path)
     assert not status["source_available"]
-    assert not status["real_inference_ready"]
+    assert not status["execution_interface_available"]
 
 
 def test_actual_backend_interfaces_without_model_loading():
