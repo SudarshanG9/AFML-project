@@ -1,0 +1,165 @@
+{
+  "repository": "SudarshanG9/AFML-project",
+  "date": "2026-11-15",
+  "scope": "Phases 1\u20133 interim backend integration only; not final release validation",
+  "initial_main": "a6c9bf786efe5e5290baf9ec24d5efb7d12fda80",
+  "integrated_payload_commit": "9310ec4fe0a9c28c8c985dcecf11d49f25aa26b2",
+  "source_shas": {
+    "origin/main": "a6c9bf786efe5e5290baf9ec24d5efb7d12fda80",
+    "origin/member1": "9eb32dec1ecf9a0c901b520bcd7252b8ecb60a8b",
+    "18d4af3": "18d4af3fa05c9453eafb4666f78f0d5867bc3437",
+    "origin/cleanup/member1-backend": "e7d0127fd6abb72163b0c55e1c24d8387790eb50",
+    "origin/cleanup/member2-data-evaluation": "84042f613ad7b607c6e29abd2b7b3dd1a0393918",
+    "origin/cleanup/member3-runtime": "e863a2d4ee55b73c4e262a7a753c6ad3da8a37e0",
+    "4c1578c": "4c1578c0276120ebd155a8ce7236d37103c26927",
+    "origin/cleanup/repository-hygiene": "c252c014865c504f1f962bf954a4c9b8267fea70",
+    "origin/cleanup/research-documentation": "9377e58978b5ac926430225050ae05e8e4c70032"
+  },
+  "phase1_member1_tests": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python3 -m pytest -q -rs -p no:cacheprovider tests/member1",
+    "result": {
+      "tests": 496,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 19,
+      "passed": 477
+    },
+    "seconds": 19.54
+  },
+  "phase2_backend_tests": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python3 -m pytest -q -rs -p no:cacheprovider tests/member1 tests/member2 tests/member3",
+    "result": {
+      "tests": 1078,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 22,
+      "passed": 1056
+    },
+    "seconds": 44.1
+  },
+  "phase3_targeted_tests": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python3 -m pytest -q -rs -p no:cacheprovider tests/member1/test_dayc_colab_pilot.py tests/member1/test_dayc_execution_package.py tests/member1/test_dayc_progress.py tests/member2/test_paired.py tests/member3/test_cli.py tests/member3/test_feature_loader.py tests/member3/test_artifacts.py",
+    "result": {
+      "tests": 239,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 19,
+      "passed": 220
+    },
+    "seconds": 8.47
+  },
+  "skip_classification": {
+    "historical_private_fixture_dependent": 19,
+    "missing_ffmpeg_ffprobe_in_phase2": 3,
+    "unconditional_skips_added": 0
+  },
+  "cli_checks": [
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli validate-config --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli run --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli predict --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli benchmark --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli inspect --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli --smoke",
+      "returncode": 0
+    }
+  ],
+  "content_parity": {
+    "reviewed_payload_commit": "2ef56ba64f9dd8756b8b971a85c9479824de7d7c",
+    "expected_composition_exact": true,
+    "expected_tree_entries": 358,
+    "hygiene_removed_count": 63,
+    "protected_member1_configs_contracts_shared_files_identical": 45,
+    "member2_final_python_paths_identical_to_main": 19,
+    "member3_runtime_python_paths_identical_to_foundation": 14,
+    "research_results_files_identical": 8,
+    "historical_member1_document_files_identical": 47,
+    "gitlink_preserved": {
+      "mode": "160000",
+      "type": "commit",
+      "oid": "830fe1ba4a5bfb53b809331fdcbcce0a977cbd36"
+    },
+    "ignore_probes_passed": [
+      "data/raw/private.mp4",
+      "checkpoints/private.pth",
+      "data/dimodif_emb/val/id/features.npz",
+      ".venv/a",
+      "src/local/__pycache__/a.pyc",
+      "artifacts/runs/private/predictions.jsonl"
+    ],
+    "unresolved_index_entries": [],
+    "frontend_changed_files": [],
+    "six_required_prediction_fields": [
+      "run_id",
+      "clip_id",
+      "split",
+      "config",
+      "score_fake",
+      "checkpoint_sha256"
+    ],
+    "feature_formats": [
+      "dimodif_npz",
+      "shared_pt"
+    ],
+    "real_research_workflows_run": false
+  },
+  "hygiene_inventory": {
+    "source": "c252c014865c504f1f962bf954a4c9b8267fea70",
+    "base": "18d4af3fa05c9453eafb4666f78f0d5867bc3437",
+    "deleted_count": 63,
+    "inventory_count": 63,
+    "inventory_exact_match": true,
+    "original_sha256_matches": 63,
+    "only_allowed_categories": true
+  },
+  "original_aggregate_verification": {
+    "overall_metric_rows_matching_saved_original": 20,
+    "paired_comparisons_matching_saved_original": 80,
+    "source_metrics_sha256": "fae7f7f8ed9f302ed4a298f8ee66f00d3b59ba679ff2f4424aad054f26355080",
+    "detector_evaluator_bootstrap_run": false
+  },
+  "inherited_whitespace": {
+    "committed_range_check_exit": 2,
+    "action": "preserved byte-identical historical files; new integration documentation and clean worktree diff checks pass"
+  },
+  "deferred": [
+    "frontend integration",
+    "full final-release gate",
+    "real-data frontend demo",
+    "real checkpoint inference",
+    "held-out scoring or threshold selection",
+    "new research benchmarking"
+  ],
+  "existing_source_branches_modified": false,
+  "main_modified": false,
+  "frontend_paths_changed": [],
+  "documentation_links": {
+    "local_targets_checked": 81,
+    "broken": []
+  },
+  "authoritative_root_readme": {
+    "scientific_content_unchanged_from_research_cleanup": true,
+    "additive_scope_notice_only": true
+  },
+  "checkpoint_and_manifest_identity_recorded": true,
+  "final_worktree_diff_check_exit": 0
+}
