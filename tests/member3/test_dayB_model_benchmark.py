@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from avfuse.member3_runtime.artifacts import validate_benchmark_records
-from scripts.dayB_model_benchmark import build_model_benchmark_records, EXPECTED_SHA
+from scripts.dayB_model_benchmark import EXPECTED_SHA, build_model_benchmark_records
 
 
 class FakeFrozenAdapter:

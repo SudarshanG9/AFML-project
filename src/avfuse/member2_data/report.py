@@ -50,6 +50,19 @@ def paired_markdown(c: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def paired_by_type_markdown(by_type: dict) -> str:
+    """One table for a pair: rows = fake type x metric (each fake type vs all real)."""
+    first = next(iter(by_type.values()))
+    lines = [f"### Paired by fake type: `{first['b']}` − `{first['a']}` ({first['split']})", "",
+             "| Fake type (vs real) | n real / fake | Metric | a | b | b − a [95% paired CI] | CI excludes 0 |",
+             "| --- | --- | --- | --- | --- | --- | --- |"]
+    for ft, c in by_type.items():
+        for k, d in c["metrics"].items():
+            lines.append(f"| {ft} | {c['n_real']} / {c['n_fake']} | {k} | {d['a']:.4f} | {d['b']:.4f} | "
+                         f"{d['delta']:+.4f} [{d['ci_low']:+.4f}, {d['ci_high']:+.4f}] | {'yes' if d['excludes_zero'] else 'no'} |")
+    return "\n".join(lines) + "\n"
+
+
 # ---------------------------------------------------------------- figures (matplotlib optional)
 
 def _plt():
