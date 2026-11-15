@@ -35,4 +35,4 @@ AppTest cannot simulate all browser file-upload controls or assess visual layout
 - Refresh discovery after a new synthetic fixture appears.
 - Confirm an unavailable device never invokes a fallback. Do not submit real inference without separate authorization for the assets.
 
-Real-input validation demonstration is not executed by this integration. The user has not authorized execution against supplied real assets. Full browser visual validation, authorized real-input demonstration, final provenance review and release approval remain Phase 5 work. Neither main nor the accepted backend branch is changed.
+Real-input validation demonstration is not executed by this integration. The user has not authorized execution against supplied real assets. The [Phase 5 release-readiness report](../docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) records current browser checks, final provenance review and any remaining limitations. Real-input demonstration requires separate exact-asset authorization; merge approval remains with the project lead. Neither main nor the accepted backend branch is changed.

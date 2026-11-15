@@ -54,4 +54,6 @@ python -m avfuse.member3_runtime.cli --help
 python -m avfuse.member3_runtime.cli --smoke
 ```
 
-See [INTEGRATION.md](INTEGRATION.md) and the [Phase 4 report](../docs/integration/PHASE_4_FRONTEND_REPORT.md) for verification evidence, limitations and deferred release checks.
+See [INTEGRATION.md](INTEGRATION.md) and the [Phase 5 release-readiness report](../docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) for current verification evidence and remaining limitations. The [Phase 4 report](../docs/integration/PHASE_4_FRONTEND_REPORT.md) is preserved as historical integration evidence.
+
+Run verification is explicit. A dated past integrity check is not a continuous guarantee; file-metadata changes invalidate its current status. Missing or malformed optional run metadata is reported by filename while other sections remain usable.
