@@ -1,5 +1,8 @@
 # Documentation authority and backend integration scope
 
+Frontend integration now exists on `integration/afml-frontend`: [application guide](../frontend/README.md) and [Phase 4 verification report](integration/PHASE_4_FRONTEND_REPORT.md). It adapts the latest frontend to the accepted backend. Final release approval and merging into `main` remain pending.
+
+
 This branch consolidates the backend through **Phases 1–3 only**. Frontend integration and the full final-release gate are deferred until the project lead authorizes them. References to frontend-facing APIs describe compatibility with a separate existing application, not an integrated or validated frontend in this branch.
 
 ## Current project explanation

@@ -1,7 +1,9 @@
 # Backend integration review for the AVFuse-CausalQ dashboard
 
-Repository: SudarshanG9/AFML-project  
-Review date: 2026-11-14  
+Historical frontend-source review (November 14). Current integration authority is [INTEGRATION.md](INTEGRATION.md) and the [Phase 4 report](../docs/integration/PHASE_4_FRONTEND_REPORT.md).
+
+Repository: SudarshanG9/AFML-project
+Review date: 2026-11-14
 Branches inspected: main, frontend, member1, feature/member2-data, feature/member3-runtime, feature/member3-segment-e, feature/member3-dayc-integration-review.
 
 The dashboard is a local Streamlit interface over the repository's real Python packages and local artifacts. It does not contain a second detector implementation, upload raw media to a server, or fabricate predictions and measurements.
