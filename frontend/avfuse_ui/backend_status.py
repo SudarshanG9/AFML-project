@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import os
+import json
+import re
+import uuid
+from dataclasses import dataclass, field
 import subprocess
 import sys
 from pathlib import Path
@@ -21,7 +25,7 @@ def detect_repo_root(start: Path) -> Path:
     return start.parent if start.name == "frontend" else start
 
 
-def git_info(root: Path) -> dict[str, str | None]:
+def git_info(root: Path) -> dict[str, Any]:
     def run(args: list[str]) -> str | None:
         try:
             proc = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
@@ -29,74 +33,47 @@ def git_info(root: Path) -> dict[str, str | None]:
             return proc.stdout.strip() if proc.returncode == 0 else None
         except (OSError, subprocess.SubprocessError):
             return None
+    dirty = run(["status", "--porcelain"])
     return {"branch": run(["branch", "--show-current"]),
             "commit": run(["rev-parse", "--short", "HEAD"]),
-            "dirty": "yes" if run(["status", "--porcelain"]) else "no"}
+            "dirty": bool(dirty) if dirty is not None else None}
 
 
 def inspect_backend(root: Path) -> dict[str, Any]:
     """Source inspection only; does not verify a checkpoint or run inference."""
-    member1 = root / "src" / "avfuse" / "member1_fusion"
-    member3 = root / "src" / "avfuse" / "member3_runtime"
-    adapter = member1 / "dimodif_adapter.py"
-    intervention = member1 / "dimodif_intervention.py"
-    cli = member3 / "cli.py"
-    adapter_text = adapter.read_text(encoding="utf-8", errors="replace") if adapter.is_file() else ""
-    intervention_text = intervention.read_text(encoding="utf-8", errors="replace") if intervention.is_file() else ""
-    cli_text = cli.read_text(encoding="utf-8", errors="replace") if cli.is_file() else ""
-    adapter_has_intervention = (
-        "def forward_with_mode" in adapter_text
-        and "intervene_dimodif_attention" in adapter_text
-        and "self.forward_with_mode" in adapter_text
-        and intervention.is_file()
-        and "fusion_attention(" in intervention_text
-    )
-    reference_only = (
-        'if mode != "reference"' in adapter_text and "NotImplementedError" in adapter_text
-    ) or ("raise NotImplementedError" in adapter_text and not adapter_has_intervention)
-    four_mode_model_ready = adapter_has_intervention and not reference_only
-    command_support = all(f'"{name}"' in cli_text for name in REQUIRED_COMMANDS)
-    runtime_files = all((member3 / name).is_file() for name in REQUIRED_RUNTIME_FILES)
-    real_cli_ready = command_support and runtime_files
-    real_inference_ready = four_mode_model_ready and real_cli_ready
-    if real_cli_ready:
-        cli_status = "real cached-feature CLI (validation / prediction / benchmark / inspect)"
-    elif "--smoke" in cli_text:
-        cli_status = "synthetic smoke only"
-    else:
-        cli_status = "CLI or required runtime components missing"
-    if four_mode_model_ready:
-        adapter_status = "four-mode DiMoDif intervention path present; checkpoint required at runtime"
-    elif reference_only:
-        adapter_status = "reference-only in checked-in DiMoDifAdapter"
-    elif adapter.is_file():
-        adapter_status = "adapter source found; four-mode path not verified"
-    else:
-        adapter_status = "missing"
-    notes = []
-    if real_inference_ready:
-        notes.extend([
-            "The checked-in CLI supports real cached-feature execution; no raw-media inference is implied.",
-            "The DiMoDif adapter dispatches all four precision configurations through the attention-intervention path.",
-            "A real run still requires the external DiMoDif checkout, matching checkpoint/config, manifest and cached feature files.",
-            "Source readiness does not reproduce metrics or authorize held-out test access.",
-        ])
-    else:
-        if not real_cli_ready:
-            notes.append("The complete Member 3 cached-feature CLI/runtime file set was not detected.")
-        if not four_mode_model_ready:
-            notes.append("A complete four-mode DiMoDif intervention dispatch was not detected.")
+    import importlib
+    required = ("member1_fusion.dimodif_adapter", "member1_fusion.dimodif_intervention",
+                "member2_data.cache", "member3_runtime.cli", "member3_runtime.artifacts",
+                "member3_runtime.feature_loader", "shared.contracts")
+    source_available = all((root / "src/avfuse" / (name.replace(".", "/") + ".py")).is_file() for name in required)
+    imported = False
+    detail = "Required source unavailable"
+    if source_available:
+        try:
+            modules = [importlib.import_module("avfuse." + name) for name in required]
+            if not all(Path(module.__file__).resolve().is_relative_to((root / "src").resolve()) for module in modules):
+                raise ImportError("Installed package does not match selected repository")
+            adapter, _, _, cli, _, _, contracts = modules
+            imported = callable(adapter.DiMoDifAdapter.forward_with_mode)
+            parser = cli.build_parser()
+            for name in REQUIRED_COMMANDS:
+                parser.parse_args([name, *({"predict": ["--output", "unused.jsonl"], "inspect": ["unused"]}.get(name, []))])
+            detail = "Actual adapter imports and CLI parser checked; no model loaded"
+        except (ImportError, AttributeError, SystemExit) as exc:
+            detail = f"Software interface check failed: {exc}"
     return {
+        "source_available": source_available, "interfaces_imported": imported,
+        "software_checked": "Interfaces imported; synthetic smoke requires explicit action" if imported else detail,
+        "assets_available": "Not checked; select explicit local assets",
+        "execution_authorized": "Only confirmed validation requests",
+        "run_completed": "Not checked",
+        "artifact_integrity_verified": "Not checked; explicit verification required",
         "repository_readme": (root / "README.md").is_file(),
-        "model_adapter_file": adapter.is_file(),
-        "intervention_file": intervention.is_file(),
-        "adapter_mode_status": adapter_status,
-        "four_mode_model_ready": four_mode_model_ready,
-        "cli_status": cli_status,
-        "real_cli_ready": real_cli_ready,
-        "real_inference_ready": real_inference_ready,
-        "notes": notes,
-    }
+        "model_adapter_file": source_available, "intervention_file": source_available,
+        "adapter_mode_status": detail, "four_mode_model_ready": imported,
+        "cli_status": detail, "real_cli_ready": imported,
+        "real_inference_ready": imported,
+        "notes": ["Source and software checks do not verify external assets, complete a run, or establish research validity."]}
 
 
 def _command_env(root: Path) -> dict[str, str]:
@@ -135,19 +112,53 @@ def run_environment_check(root: Path) -> tuple[int, str, Path]:
         return 1, f"Could not start environment check: {exc}", out
 
 
-def run_cached_feature_experiment(
+def _invoke_cached_feature_experiment(
     root: Path, *, upstream_root: str, checkpoint_name: str, manifest: str,
     feature_root: str, feature_format: str, device: str, modes: Sequence[str],
     run_id: str = "", experiment_id: str = "", require_lavdf_hash: bool = True,
     timeout_seconds: int = 86400,
 ) -> tuple[int, str]:
     """Validate then run real cached-feature inference on validation only."""
-    if not modes:
+    from avfuse.shared.contracts import PRECISION_MODES
+    from avfuse.member1_fusion.dimodif_adapter import CHECKPOINTS
+    from .data_access import load_jsonl, validate_manifest, authorized_path
+    if not modes or any(mode not in PRECISION_MODES for mode in modes):
         return 2, "Select at least one precision mode."
     if checkpoint_name not in {"lavdf", "avdeepfake1m"}:
         return 2, "Select a supported checkpoint name."
     if feature_format not in {"dimodif_npz", "shared_pt"}:
         return 2, "Select a supported feature format."
+    if not re.fullmatch(r"cpu|cuda(?::[0-9]+)?|mps", device):
+        return 2, "An explicit supported device is required."
+    if checkpoint_name != "lavdf" or not require_lavdf_hash:
+        return 7, "This study UI requires the frozen LAV-DF checkpoint hash."
+    for value in (run_id, experiment_id):
+        if value and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,95}", value):
+            return 2, "Invalid run or experiment identifier."
+    run_id = run_id or "ui-" + uuid.uuid4().hex
+    if (root / "artifacts/member3/runs" / run_id).exists():
+        return 2, "Run ID already exists; duplicate execution refused."
+    try:
+        upstream = authorized_path(root, upstream_root)
+        manifest_path = authorized_path(root, manifest)
+        features = authorized_path(root, feature_root)
+        checkpoint = upstream / "ckpt/dfd" / (CHECKPOINTS[checkpoint_name] + ".pth")
+        if not features.is_dir() or not checkpoint.is_file() or not checkpoint.with_suffix(".json").is_file():
+            return 6, "Missing feature root, checkpoint or model configuration."
+        rows = load_jsonl(manifest_path)
+        errors = validate_manifest(rows, root / "contracts/schemas/manifest.schema.json")
+        if errors or any(row.get("split") != "val" for row in rows):
+            return 2, "Use a schema-valid validation-only manifest: " + "; ".join(errors[:3])
+        from avfuse.member3_runtime.feature_loader import dimodif_npz_path
+        for row in rows:
+            cache = (dimodif_npz_path(features, "val", row["clip_id"]) if feature_format == "dimodif_npz"
+                     else features / row["feature_path"])
+            cache = authorized_path(root, cache)
+            if not cache.is_relative_to(features) or not cache.is_file():
+                return 6, "Missing cache or cache escapes selected feature root."
+        upstream_root, manifest, feature_root = str(upstream), str(manifest_path), str(features)
+    except (OSError, ValueError) as exc:
+        return 6, str(exc)
     common = [
         "--upstream-root", upstream_root, "--checkpoint-name", checkpoint_name,
         "--manifest", manifest, "--feature-root", feature_root,
@@ -157,7 +168,7 @@ def run_cached_feature_experiment(
     if checkpoint_name == "lavdf" and require_lavdf_hash:
         common.append("--require-lavdf-hash")
     env = _command_env(root)
-    validate_cmd = [sys.executable, "-m", "avfuse.member3_runtime.cli", "validate-config", *common]
+    validate_cmd = [sys.executable, "-m", "avfuse.member3_runtime.cli", "validate-config", *common, "--json"]
     try:
         checked = subprocess.run(validate_cmd, cwd=root, env=env, capture_output=True,
                                  text=True, timeout=300, check=False)
@@ -168,12 +179,18 @@ def run_cached_feature_experiment(
     validate_output = (checked.stdout + ("\n" + checked.stderr if checked.stderr else "")).strip()
     if checked.returncode != 0:
         return checked.returncode, "VALIDATE-CONFIG FAILED\n" + validate_output
+    try:
+        validation = json.loads(checked.stdout)
+        if not isinstance(validation, dict) or validation.get("ok") is not True:
+            raise ValueError("Missing successful validation status")
+    except ValueError as exc:
+        return 1, f"Malformed backend validation JSON: {exc}"
     run_options = ["--runs-root", "artifacts/member3/runs"]
     if run_id.strip():
         run_options.extend(["--run-id", run_id.strip()])
     if experiment_id.strip():
         run_options.extend(["--experiment-id", experiment_id.strip()])
-    run_cmd = [sys.executable, "-m", "avfuse.member3_runtime.cli", "run", *common, *run_options]
+    run_cmd = [sys.executable, "-m", "avfuse.member3_runtime.cli", "run", *common, *run_options, "--json"]
     try:
         executed = subprocess.run(run_cmd, cwd=root, env=env, capture_output=True,
                                   text=True, timeout=timeout_seconds, check=False)
@@ -182,4 +199,34 @@ def run_cached_feature_experiment(
     except OSError as exc:
         return 1, f"Could not start backend run: {exc}"
     run_output = (executed.stdout + ("\n" + executed.stderr if executed.stderr else "")).strip()
-    return executed.returncode, "VALIDATE-CONFIG PASSED\n" + validate_output + "\n\nRUN\n" + run_output
+    from avfuse.member3_runtime.cli import EXIT_NAMES
+    if executed.returncode == 0:
+        try:
+            result = json.loads(executed.stdout)
+            if not isinstance(result, dict) or result.get("status") != "complete" or result.get("finalized") is not True:
+                raise ValueError("Successful exit lacks completed and finalized status")
+        except ValueError as exc:
+            return 1, f"Malformed backend run JSON: {exc}"
+    run_output = f"Status: {EXIT_NAMES.get(executed.returncode, 'UNKNOWN')}\nRun directory: {root / 'artifacts/member3/runs' / run_id}\n" + run_output
+    return RunResult(executed.returncode, run_output,
+                     {"validation": validation, "execution": result if executed.returncode == 0 else None,
+                      "run_dir": str(root / "artifacts/member3/runs" / run_id)})
+
+
+@dataclass
+class RunResult:
+    code: int
+    diagnostics: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+    def __iter__(self):
+        return iter((self.code, self.diagnostics))
+
+    def __getitem__(self, index):
+        return (self.code, self.diagnostics)[index]
+
+
+def run_cached_feature_experiment(root: Path, **request: Any) -> RunResult:
+    """Expose structured status separately from raw subprocess diagnostics."""
+    result = _invoke_cached_feature_experiment(root, **request)
+    return result if isinstance(result, RunResult) else RunResult(*result)

@@ -27,8 +27,9 @@ default_root = detect_repo_root(start)
 with st.sidebar:
     st.markdown('<div class="avf-brand"><div class="avf-mark">AV</div><div>AVFuse-CausalQ<br><span style="color:#91a4bd;font-size:.72rem;font-weight:500">Research dashboard</span></div></div>', unsafe_allow_html=True)
     st.write("")
-    root_input = st.text_input("Repository root", value=str(default_root), help="Folder containing pyproject.toml, src/, contracts/ and artifacts/.")
-    repo_root = Path(root_input).expanduser().resolve()
+    repo_root = default_root.resolve()
+    st.caption(f"Server repository: {repo_root}")
+    st.button("Refresh discovered artifacts")
     valid_root = (repo_root / "pyproject.toml").is_file() and (repo_root / "src/avfuse").is_dir()
     if not valid_root:
         st.error("This folder does not look like the AVFuse-CausalQ repository.")
@@ -68,4 +69,4 @@ else:
 
 with st.sidebar:
     st.divider()
-    st.caption(f"Discovered locally: {len(files['manifests'])} manifest · {len(files['predictions'])} prediction file(s) · {len(files['benchmarks'])} benchmark file(s) · {len(files['run_dirs'])} finalized run folder(s)")
+    st.caption(f"Discovered locally: {len(files['manifests'])} manifest · {len(files['predictions'])} prediction file(s) · {len(files['benchmarks'])} benchmark file(s) · {len(files['run_dirs'])} discovered run folder(s)")
