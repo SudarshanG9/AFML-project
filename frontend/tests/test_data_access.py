@@ -13,6 +13,7 @@ from avfuse_ui.data_access import (
     documented_validation_table,
     documented_test_results,
     documented_benchmark_summary,
+    dimodif_npz_inspection_path,
     discover_files,
     feature_file_summary_bytes,
     parse_jsonl_text,
@@ -188,3 +189,17 @@ Typical E_query = −0.03 ms
 
 def test_documented_benchmark_summary_ignores_unrecognized_report() -> None:
     assert documented_benchmark_summary("No benchmark data here") is None
+
+
+def test_dimodif_npz_inspection_path_uses_explicit_loader_layout(tmp_path: Path) -> None:
+    path = dimodif_npz_inspection_path(tmp_path, "data/pilot/test_day2", "val", "clip-001")
+    assert path == (tmp_path / "data/pilot/test_day2/val/clip-001/features.npz").resolve()
+
+
+def test_dimodif_npz_inspection_path_rejects_unsafe_or_outside_paths(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="val or test"):
+        dimodif_npz_inspection_path(tmp_path, ".", "train", "clip-001")
+    with pytest.raises(ValueError, match="unsafe"):
+        dimodif_npz_inspection_path(tmp_path, ".", "val", "../outside")
+    with pytest.raises(ValueError, match="outside the selected repository"):
+        dimodif_npz_inspection_path(tmp_path, "../outside", "val", "clip-001")

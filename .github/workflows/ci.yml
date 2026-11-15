@@ -5,7 +5,7 @@ name: ci
 
 on:
   push:
-    branches: [main, "feature/**", member1, member2, member3, frontend]
+    branches: [main, "feature/**", member1, member2, member3, "member3/**", frontend]
   pull_request:
 
 permissions:

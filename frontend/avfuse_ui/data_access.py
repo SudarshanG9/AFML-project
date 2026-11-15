@@ -243,6 +243,33 @@ def _summarize_feature_payload(payload: Any, suffix: str) -> dict[str, Any]:
             "note": "Inspected only; no model inference was run."}
 
 
+def dimodif_npz_inspection_path(
+    root: Path,
+    feature_root: str | Path,
+    split: Any,
+    clip_id: Any,
+) -> Path:
+    """Resolve the explicit DiMoDif NPZ layout without leaving the repository.
+
+    The Member 3 loader uses <feature_root>/<split>/<clip_id>/features.npz
+    for dimodif_npz and does not consult the manifest's planned .pt path.
+    """
+    if split not in ("val", "test"):
+        raise ValueError("DiMoDif NPZ inspection supports only the val or test split")
+    if not isinstance(clip_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", clip_id):
+        raise ValueError("clip_id contains characters that are unsafe for a feature path")
+    if not str(feature_root).strip():
+        raise ValueError("Enter a non-empty DiMoDif feature root")
+
+    repo_root = Path(root).expanduser().resolve()
+    base = Path(feature_root).expanduser()
+    if not base.is_absolute():
+        base = repo_root / base
+    target = (base / str(split) / clip_id / "features.npz").resolve()
+    if not target.is_relative_to(repo_root):
+        raise ValueError("DiMoDif feature root resolves outside the selected repository")
+    return target
+
 def feature_file_summary(path: Path) -> dict[str, Any]:
     """Inspect supported local cache files without running a model."""
     suffix = path.suffix.lower()
