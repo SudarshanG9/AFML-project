@@ -2,6 +2,8 @@
 
 **A controlled study of numerical precision inside a frozen audiovisual deepfake detector.**
 
+**Integration scope:** this branch completes backend Phases 1–3. Frontend integration and full final-release validation remain deferred. See the [integration report](docs/integration/PHASES_1_TO_3_REPORT.md) and [documentation authority index](docs/README.md).
+
 Can reducing precision in audiovisual fusion change forensic decisions, and can retaining precision in the value/output path repair more damage than retaining query precision at comparable measured cost? AVFuse-CausalQ investigates that question using pretrained **DiMoDif**, whole **LAV-DF** videos, four frozen precision configurations, source-grouped statistics and CPU cached-feature benchmarks.
 
 The motivation is practical: efficient inference is useful only if the detector retains the evidence needed to recognize audio-only, video-only and joint manipulations. The contribution is a documented precision-sensitivity experiment with authentic saved results and provenance. It is not a newly trained detector, a new attention/quantization algorithm or a demonstrated deployment speedup.
