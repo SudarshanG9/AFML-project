@@ -19,6 +19,8 @@ def load(name,path):
 
 @pytest.fixture
 def candidate_incident(tmp_path,monkeypatch):
+    if not CANDIDATE.is_file():
+        pytest.skip('Historical candidate comparison requires private recovery candidate: ' + str(CANDIDATE))
     candidate=load('AFML_TEST_FIXTURE_CANDIDATE',CANDIDATE)
     base=load('AFML_TEST_FIXTURE_BASE',ROOT/'tests/member1/test_dayc_incident_recovery.py')
     monkeypatch.setattr(base,'r',candidate)
