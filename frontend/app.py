@@ -40,7 +40,7 @@ with st.sidebar:
 
 if not valid_root:
     st.title("Repository not found")
-    st.write("Point the Repository root field to your local `AFML-project` checkout.")
+    st.write("Set AVFUSE_REPO_ROOT to your local AFML-project checkout before starting Streamlit.")
     st.stop()
 
 # Make the project package importable for backend checks and the existing integrity verifier.
