@@ -1,5 +1,8 @@
 # AVFuse-CausalQ
 
+Frontend integration now exists on `integration/afml-frontend`: [application guide](frontend/README.md) and [Phase 4 verification report](docs/integration/PHASE_4_FRONTEND_REPORT.md). It adapts the latest frontend to the accepted backend. Final release approval and merging into `main` remain pending.
+
+
 **A controlled study of numerical precision inside a frozen audiovisual deepfake detector.**
 
 **Integration scope:** this branch completes backend Phases 1–3. Frontend integration and full final-release validation remain deferred. See the [integration report](docs/integration/PHASES_1_TO_3_REPORT.md) and [documentation authority index](docs/README.md).
