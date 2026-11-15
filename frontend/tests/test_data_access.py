@@ -201,5 +201,5 @@ def test_dimodif_npz_inspection_path_rejects_unsafe_or_outside_paths(tmp_path: P
         dimodif_npz_inspection_path(tmp_path, ".", "train", "clip-001")
     with pytest.raises(ValueError, match="unsafe"):
         dimodif_npz_inspection_path(tmp_path, ".", "val", "../outside")
-    with pytest.raises(ValueError, match="outside the selected repository"):
+    with pytest.raises(ValueError, match="outside server-authorized roots"):
         dimodif_npz_inspection_path(tmp_path, "../outside", "val", "clip-001")
