@@ -68,6 +68,51 @@ Our intended contribution was a **falsifiable, reproducible answer**, even if th
 - Measured operator and model costs with explicit boundaries and hardware details.
 - Reusable code, experiment/provenance records, a CLI, and an interactive research dashboard.
 
+### 2.1 How a user experiences the end system
+
+**Think of AVFuse-CausalQ as a research laboratory you can inspect, rather than a website where you upload any video and instantly get a fake/real verdict.** The end system has two distinct uses: (A) explore the **already completed, accepted experiment**, which needs no private checkpoint or dataset; and (B) run a **new, explicitly authorized validation-only experiment** through the real pretrained backend, which requires compatible external assets. The dashboard clearly separates those two sources of evidence.
+
+```mermaid
+flowchart TD
+    U[User opens the Streamlit research dashboard] --> C{What would you like to do?}
+    C -->|Understand the completed study| A[Read Overview and inspect the dataset and fusion diagnostics]
+    A --> E[Open Evaluation: accepted metrics and paired confidence intervals]
+    E --> B[Open Benchmarks: saved CPU timing measurements]
+    B --> F[Interpret hypotheses, findings and limitations]
+    C -->|Run a permitted new validation experiment| V[Supply authorized DiMoDif checkout, checkpoint, manifest and cached AV features]
+    V --> Q[Confirm inputs and choose precision modes]
+    Q --> R[Streamlit calls the actual Member 3 validation and run CLI]
+    R --> M[Member 1 loads frozen DiMoDif and computes fake probabilities]
+    M --> P[Member 3 saves predictions, benchmarks and provenance]
+    P --> I[Inspect outputs and explicitly verify run integrity]
+    I --> G[Use Member 2 evaluation separately if an authorized report is needed]
+```
+
+#### Path A — Explore the completed research (recommended first)
+
+1. **Launch the dashboard.** Follow [Section 10](#10-using-the-system-and-reproducing-the-evidence) or the [frontend launch guide](frontend/README.md). The application opens locally; merely viewing a page **does not load the pretrained model or rerun the held-out test**.
+2. **Start at _Overview_.** Read the objective, implementation status and available research artifacts. A successful software-interface check means the relevant Python code imports; it does **not** mean an external checkpoint was loaded or real inference completed.
+3. **Visit _Dataset & features_.** Learn how whole LAV-DF videos are grouped into real, audio-fake, video-fake and both-fake categories, and why cached audio/video encoder features are used instead of raw media at inference time.
+4. **Open _Fusion diagnostics_.** Inspect saved attention, masking, ablation and memory evidence wherever present. These explain *where* numerical interventions happen; they are not themselves proof of better detection.
+5. **Open _Evaluation_ → _Saved research results_.** Inspect the accepted four-mode AUROC, average precision, BCE, recall, false-positive rate, manipulation-specific results and paired 95% confidence intervals. These are **original saved measurements**, not numbers generated when the page opens. Pay particular attention to the paired BCE comparisons: intervals spanning zero do not establish overall precision damage or a V/output restoration advantage.
+6. **Open _Benchmarks_.** Compare the saved CPU model runtimes across the four modes and three workloads. These measure **cached-feature model calls**, including applicable simulated-quantization work—not the time to decode, preprocess and classify a raw video, or a native INT8 hardware speedup.
+7. **Visit _Runs & system_ and _Artifact import_ if you want to audit more evidence.** You can inspect discovered run folders, explicitly request an integrity check, or select supported local/uploaded artifacts. A file's presence or a previous integrity receipt is not proof of a completed, scientifically accepted experiment.
+
+**What you should understand by the end of Path A:** what the team hypothesized, what changed mathematically in the frozen detector, how the results were measured, **what the data actually support**, and where the limits of that conclusion lie. No model download or new experiment is needed to read the accepted results.
+
+#### Path B — Execute the real backend on authorized validation inputs (optional)
+
+This path is for a developer/researcher who has the **pinned external DiMoDif source and LAV-DF checkpoint**, an appropriate **validation-only manifest**, and the **complete compatible precomputed feature cache**, with permission to use them. The dashboard does **not** accept arbitrary uploaded MP4s for raw-video deepfake inference; its model input consists of encoder-generated audio/video tensors.
+
+1. Open **_Demo & predictions_** and select the approved LAV-DF model, feature format, device and one or more of the four precision modes. Enter a **new run ID**, provide the server-authorized filesystem paths, and explicitly confirm the inputs. The UI checks for validation-only use and enforces the agreed checkpoint identity.
+2. The frontend calls `python -m avfuse.member3_runtime.cli validate-config`, followed—only when validation succeeds—by the actual `run` command. This is a real backend subprocess, **not a mock detector hidden behind the interface**.
+3. **Member 3** loads the approved cached features; **Member 1** constructs the frozen DiMoDif model and runs the selected reference/precision-intervention paths. The runtime writes computed fake-score rows, scoped benchmarks, execution summaries and provenance. Missing inputs, incompatible modes, incomplete runs or failures are reported instead of replaced with fictional predictions.
+4. Return to **_Demo & predictions_** or **_Runs & system_** to inspect discovered outputs. Perform explicit run-integrity verification where appropriate. If you need new **label-grounded evaluation metrics and statistical comparisons**, run the **separate Member 2 evaluator** with the permitted validation evidence and then inspect its report; completing inference alone does not automatically calculate a new AUROC or approve a research result.
+
+**Important boundary:** The dashboard's **synthetic smoke test** checks software wiring only; it must not be presented as a checkpoint-backed prediction. The completed held-out study remains frozen, and no casual dashboard interaction should reopen or retune it. At the documented Phase 5 handoff, the frontend-to-backend integration passed automated tests, but a full live real-model validation run through the UI was **not independently demonstrated** with the complete authorized feature cache.
+
+For full setup instructions, prerequisites and reproducibility limits, read [Section 10](#10-using-the-system-and-reproducing-the-evidence), the [frontend guide](frontend/README.md), and the [Phase 5 readiness report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md).
+
 ## 3. Technical choices, models, and datasets
 
 ### 3.1 Detector selection: DiMoDif instead of AVFF
