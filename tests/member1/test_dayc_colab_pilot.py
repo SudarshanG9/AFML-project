@@ -28,6 +28,9 @@ def package_fixture(tmp_path):
         'artifacts/dayB/final_review/DayB_FINAL_CPU_20261112T031627Z_91e5f723/received_evidence/provenance/g5/execution_context.json']
     names += [str(p.relative_to(actual)) for p in (actual/'artifacts/dayC/member1/approvals').glob('C8_2_RUNTIME_*.json')]
     names += [str(p.relative_to(actual)) for p in (actual/'artifacts/dayC/member1/approvals').glob('C8_2_CACHE_MAPPING_*.json')]
+    missing = [name for name in names if not (actual / name).is_file()]
+    if missing:
+        pytest.skip("Historical package check requires private evidence: " + ", ".join(missing))
     for name in names:
         dest = root/name
         dest.parent.mkdir(parents=True,exist_ok=True)

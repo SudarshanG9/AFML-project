@@ -60,6 +60,8 @@ def test_checkpoint_staging_is_exact_and_never_overwrites(tmp_path):
 
 def test_package_has_complete_import_closure_without_original_checkout(tmp_path):
     original=Path(__file__).resolve().parents[2];root=tmp_path/'TEST_FIXTURE_SOURCE';root.mkdir()
+    if not (original / b.BASE).is_file():
+        pytest.skip('Historical import-closure check requires private execution archive: ' + b.BASE)
     base=root/b.BASE;base.parent.mkdir(parents=True);shutil.copyfile(original/b.BASE,base)
     registry={}
     for name in SCORING_FILES:
