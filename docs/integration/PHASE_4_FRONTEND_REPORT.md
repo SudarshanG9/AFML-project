@@ -98,7 +98,9 @@ All above completed successfully. Synthetic smoke scores are not research output
 
 A fresh virtual environment was created and the requested editable/backend and frontend installation was attempted. Download/install failed with **OSError 28: no space left on device**. Only that incomplete task-created virtual environment was removed. Local test evidence therefore comes from the installed environment, not a successful clean installation. CI provides the clean Python 3.10/3.12 installation checks when available.
 
-Hosted CI status: pending initial push; see subsequent verification note and delivery message for actual observed status. No hosted pass is asserted here.
+Hosted CI **passed on both Python 3.10 and 3.12** for implementation/documentation commit `7d5b6efa495c525f02054fdf2817af42d0d30370`: [run 43714067023](https://github.com/SudarshanG9/AFML-project/actions/runs/43714067023). Public job status confirms clean install, scoped lint, all backend tests, explicit frontend tests, syntax compilation and CLI smoke succeeded on both versions. Remote test counts were not extracted; the precise counts above are local results.
+
+After a wording-only clarification (adapter/CLI interface labels and missing-run text), all **82 frontend tests passed** again in 5.08 seconds. All 56 local links in the current root/docs/frontend guides and this report resolve. The final delivery message reports the final branch tip and any subsequent hosted run separately.
 
 ## Acceptance checklist
 
@@ -111,7 +113,7 @@ Hosted CI status: pending initial push; see subsequent verification note and del
 | Validation-only controls | Argument-list tests across all statuses; no unseal/protocol/purpose flags assembled |
 | Feature/artifact contracts | Actual loaders, benchmark validator and integrity API tested |
 | Backend regressions/frontend tests | 1,160 passes; 22 documented existing skips |
-| CI | Both Python versions configured; hosted result reported separately |
+| CI | Clean hosted Python 3.10 and 3.12 jobs passed; run linked above |
 | Scientific controls | No production/evidence changes, no held-out evaluation |
 | Main and source branches | Not modified by this work; only target branch is pushed |
 | Final release gate | Explicitly deferred |
@@ -120,7 +122,7 @@ Hosted CI status: pending initial push; see subsequent verification note and del
 
 | Severity | Exact files/scope | Limitation and next action |
 |---|---|---|
-| Validation limitation | `.github/workflows/ci.yml` | Local clean install blocked by disk space; verify clean hosted Python 3.10/3.12 jobs before release |
+| Validation limitation | `.github/workflows/ci.yml` | Local clean install blocked by disk space; hosted clean installs and tests passed on Python 3.10/3.12. Reclaim local space before a local clean-install repeat |
 | Validation limitation | `frontend/tests/test_ui.py`, `frontend/INTEGRATION.md` | AppTest does not establish browser visual quality or every upload-widget gesture; perform documented browser checks |
 | Authorization boundary | `frontend/avfuse_ui/backend_status.py` | Real-input validation demonstration not executed; supplied real assets were not authorized for execution. Obtain explicit validation-only asset/run authorization |
 | Existing private dependencies | Three Member 1 test modules named above | Restore authorized historical fixtures only if required for final provenance review |
@@ -128,4 +130,4 @@ Hosted CI status: pending initial push; see subsequent verification note and del
 | Style debt | Existing backend files and `frontend/avfuse_ui/*.py` | Full configured Ruff is not clean; review style debt separately without rewriting frozen scientific code |
 | Provenance limitation | `frontend/avfuse_ui/ui.py` | Prediction rows lack dataset identity; consult run provenance before any cross-run scientific comparison |
 
-Before merging into main: review hosted results for both Python versions, complete browser checks, optionally perform an explicitly authorized real-validation demonstration, review final provenance and private-fixture requirements, and obtain separate final release approval. Do not reopen accepted held-out evaluation. PRs #8/#10 remain untouched.
+Before merging into main: retain passing Python 3.10/3.12 checks on the final release candidate (rerun after subsequent changes), complete browser checks, optionally perform an explicitly authorized real-validation demonstration, review final provenance and private-fixture requirements, and obtain separate final release approval. Do not reopen accepted held-out evaluation. PRs #8/#10 remain untouched.

@@ -174,8 +174,8 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
         panel_title("Backend readiness", "Detected from the checked-in source tree, not from assumptions in the proposal.")
         rows = [
             ("Python package / shared contracts", (root / "pyproject.toml").is_file() and (root / "contracts/schemas").is_dir(), "Package and JSON schemas found"),
-            ("Four-mode model inference", status["four_mode_model_ready"], status["adapter_mode_status"]),
-            ("Four-mode cached-feature CLI", status["real_inference_ready"], status["cli_status"]),
+            ("Four-mode adapter interface", status["four_mode_model_ready"], status["adapter_mode_status"]),
+            ("Cached-feature CLI interface", status["real_inference_ready"], status["cli_status"]),
             ("Local prediction outputs", prediction_count > 0, f"{prediction_count} files discovered"),
             ("Structured benchmark outputs", benchmark_count > 0, f"{benchmark_count} files discovered"),
         ]
@@ -1050,7 +1050,7 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
                         except (OSError, ValueError) as exc:
                             st.error(str(exc))
         else:
-            st.caption("No finalized run folders found under artifacts/runs/run-*.")
+            st.caption("No run directories found under artifacts/runs/ or artifacts/member3/runs/.")
     st.divider()
     panel_title("Run bundle contents", "Expected files created by Member 3's RunContext when a run is finalized.")
     st.code("""artifacts/runs/<run_id>/
