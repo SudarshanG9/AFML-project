@@ -1,57 +1,89 @@
 # AVFuse-CausalQ
 
-**IO-Aware, Precision-Controlled Audio-Visual Fusion for Deepfake Detection**
+Frontend integration now exists on `integration/afml-frontend`: [application guide](frontend/README.md) and [Phase 4 verification report](docs/integration/PHASE_4_FRONTEND_REPORT.md). It adapts the latest frontend to the accepted backend. Final release approval and merging into `main` remain pending.
 
-> **Status:** repository scaffold and unit-testable research primitives, **NOT** a trained or validated deepfake detector. Before interpreting results, select a real checkpoint, verify its cross-modal fusion boundary, obtain licensed labeled clips, and complete end-to-end integration.
 
-## Research question
+**A controlled study of numerical precision inside a frozen audiovisual deepfake detector.**
 
-Under source-disjoint, manipulation-stratified evaluation, does simulated INT8-style precision reduction inside a joint audio-visual detector's cross-modal attention change forensic correctness by attack type (audio-fake, video-fake, both-fake)? Can selective value/output-path restoration recover more loss than a query-path restoration control relative to *measured* added cost?
+**Integration scope:** backend Phases 1–3 and frontend Phase 4 are complete. Member 1's frozen pretrained adapter/four modes, Member 2's whole-video evaluation and paired analysis, Member 3's cached-feature CLI/benchmarks/provenance, repository cleanup, research documentation, Streamlit dashboard and automated integration tests are integrated. Python 3.10 and 3.12 CI passed for Phase 4.
 
-## Three member-owned components
+**Final review:** Phase 5 is the current engineering gate; its [release-readiness report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) records current tests, browser checks, limitations and the decision for merge review. Any remaining browser checks, optional explicitly authorized real-validation demonstration and project-lead approval to merge into `main` must be distinguished from the completed accepted research. Earlier [Phases 1–3](docs/integration/PHASES_1_TO_3_REPORT.md) and [Phase 4](docs/integration/PHASE_4_FRONTEND_REPORT.md) reports are historical execution evidence.
 
-| Member | Code path | Owns | Produces |
-|---|---|---|---|
-| **Member 1 / Lead** | `src/avfuse/member1_fusion/` | checkpoint adapter, attention oracle/SDPA, numerical interventions, ablations | four model configurations, predictions |
-| **Member 2** | `src/avfuse/member2_data/` | licensed data, source/identity-disjoint splits, caching, forensic evaluation | `manifest.jsonl`, tensor cache, stratified metrics |
-| **Member 3** | `src/avfuse/member3_runtime/` | timing, peak memory, repeatability, orchestration, CLI | benchmark records, environment details, demo |
+Can reducing precision in audiovisual fusion change forensic decisions, and can retaining precision in the value/output path repair more damage than retaining query precision at comparable measured cost? AVFuse-CausalQ investigates that question using pretrained **DiMoDif**, whole **LAV-DF** videos, four frozen precision configurations, source-grouped statistics and CPU cached-feature benchmarks.
 
-Shared schemas are in `contracts/schemas/`; reference decisions and integration gates are in `docs/`.
+The motivation is practical: efficient inference is useful only if the detector retains the evidence needed to recognize audio-only, video-only and joint manipulations. The contribution is a documented precision-sensitivity experiment with authentic saved results and provenance. It is not a newly trained detector, a new attention/quantization algorithm or a demonstrated deployment speedup.
 
-## Install and run the scaffold
+## What was built
+
+Offline auto-AVSR encoders produce cached audio/video features. The frozen DiMoDif adapter aligns and pads them, instruments all five joint self-attention layers and preserves the original detection head. The runtime writes predictions without labels; the evaluator later compares them with ground truth.
+
+| Mode | Activation boundaries rounded to simulated symmetric INT8 |
+| --- | --- |
+| `reference` | none |
+| `low_precision` | Q, K, V and attention output |
+| `restore_value_output` | Q and K |
+| `restore_query` | K, V and attention output |
+
+All modes execute in floating point. Weights, softmax, projections and other model paths retain FP32. This is fake-quant numerical sensitivity, not native INT8 storage or kernels. Restoration is cumulative across layers and V/output is bundled.
+
+| Owner package | Responsibility |
+| --- | --- |
+| [`member1_fusion`](src/avfuse/member1_fusion/) | pretrained adapter, attention, four interventions and frozen execution safeguards |
+| [`member2_data`](src/avfuse/member2_data/) | data/feature preparation, prediction contracts, source-grouped metrics and paired comparisons |
+| [`member3_runtime`](src/avfuse/member3_runtime/) | CLI, cached-feature orchestration, benchmark infrastructure and artifact integrity |
+
+## Authentic final results
+
+The canonical cohort contains 1,200 validation and 2,000 test videos. Test has 500 authentic and 500 of each fake category. One reference-validation threshold, **0.6627789735794068**, applies to every mode.
+
+| Test mode | AUROC | Average precision | BCE | Recall | Real FPR |
+| --- | --- | --- | --- | --- | --- |
+| reference | 0.998044000 | 0.999352103 | 0.067792265 | 0.992 | 0.042 |
+| low precision | 0.998033333 | 0.999348271 | 0.068121211 | 0.992 | 0.042 |
+| V/output restored | 0.998037333 | 0.999349608 | 0.068176098 | 0.992 | 0.042 |
+| Q restored | 0.998040000 | 0.999350411 | 0.067693347 | 0.992 | 0.042 |
+
+The paired BCE damage estimate (low−reference) is +0.000328946, 95% CI [−0.000237371,+0.000962465]. V/output−Q BCE is +0.000482751 [−0.000164867,+0.001185028]. Neither establishes the proposed overall degradation/restoration advantage. Equal displayed rates do not prove statistical equivalence or general precision robustness. [Full intervals, per-manipulation results and original figures](docs/06_EXPERIMENTS_AND_RESULTS.md) explain the evidence.
+
+Accepted typical CPU model p50 latencies are 118.454/161.434/119.918/167.474 ms in the table's mode order. These include applicable fake-quant conversions on resident cached features. They exclude raw-media preparation and do not demonstrate native INT8 acceleration, reliable equal restoration costs or measured peak-memory savings.
+
+## Start here
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate           # on Windows: .venv\Scripts\activate
+source .venv/bin/activate
 python -m pip install -e '.[dev]'
-python scripts/check_environment.py
-pytest -q
+python -m pip install -r frontend/requirements.txt
+python -m avfuse.member3_runtime.cli --help
 python -m avfuse.member3_runtime.cli --smoke
 ```
 
-The **smoke CLI intentionally uses synthetic tensors and a randomly initialized toy fusion head**. Its fake-score outputs are not scientific results. It only confirms module wiring.
+Launch the dashboard from the repository root after installing dependencies:
 
-## Research outputs (planned; not yet generated)
-
-```text
-data/cache/<clip_id>.pt          # encoder tokens or an explicitly documented feature boundary
-artifacts/predictions/*.jsonl   # one line per clip per configuration
-artifacts/benchmarks/*.jsonl    # one line per configuration/device/scope
-artifacts/reports/              # validation/test statistics and intervals
-artifacts/runs/                 # frozen run config + hashes + software/device info
+```bash
+cd frontend
+PYTHONPATH=../src:. python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
-Data, personally sensitive clips, model weights and generated results are excluded from git by default. See `data/README.md`.
+The [frontend guide](frontend/README.md) explains `AVFUSE_REPO_ROOT`, authorized external asset roots and server-side uploads. The app does not execute real inference on launch.
 
-## Ground rules
+The smoke command is a synthetic wiring check. Real validation inference requires a separately supplied DiMoDif checkout/checkpoint, validation manifest and compatible feature cache. The runtime consumes **cached encoder features**, not arbitrary raw video. See the [step-by-step user guide](docs/09_REPRODUCIBILITY_AND_USER_GUIDE.md) for asset hashes, supported commands and validation-only demonstrations.
 
-1. **Model:** lock a real, reproducible checkpoint and audit its training-set overlap with evaluation clips before experiments.
-2. **No fabricated results:** do not treat the synthetic smoke test as forensic evaluation.
-3. **Cache boundary:** when frozen encoder outputs are cached, model-level latency means **cached-feature fusion + head**, not raw-video inference. Separately report raw-media preprocessing and feature-encoding costs.
-4. **Precision:** `fake_quant_int8` numerically emulates symmetric quantization while tensors remain floating point. No claim of real 8-bit kernel speedups.
-5. **Restoration control:** value **and output** restoration may not cost the same as query-only restoration. Compare empirical added cost; never assume equal work.
-6. **Data discipline:** choose the threshold and any precision policy on validation data. Run held-out test scoring only after freeze.
-7. **Evaluation:** for each attack-type AUROC/AUPRC, compare that fake class **against real clips**, not a single-positive-class subset.
-8. **PRs:** changes to `contracts/`, `configs/`, and orchestration need review from all affected owners.
+## Read the research
 
-See `docs/ARCHITECTURE.md`, `docs/OWNERSHIP.md`, `docs/CONTRACTS.md`, and `docs/PLAN_12_DAYS.md`.
+| Chapter | Purpose |
+| --- | --- |
+| [1. Foundations](docs/01_RESEARCH_FOUNDATIONS.md) | original question, concepts and H1/H2/H3 |
+| [2. Literature and novelty](docs/02_LITERATURE_REVIEW_AND_NOVELTY.md) | technical prior art and provisional contribution |
+| [3. Decisions and pivots](docs/03_RESEARCH_DECISIONS_AND_PIVOTS.md) | AVFF/FakeAVCeleb intention through DiMoDif/LAV-DF and C10R recovery |
+| [4. Architecture](docs/04_FINAL_SYSTEM_ARCHITECTURE.md) | tensor flow, equations, interfaces and frontend boundary |
+| [5. Methodology](docs/05_DATASET_AND_EXPERIMENTAL_METHODOLOGY.md) | cohorts, extraction, freeze, bootstrap and cost protocol |
+| [6. Experiments and results](docs/06_EXPERIMENTS_AND_RESULTS.md) | authentic numerical evidence and interpretation |
+| [7. Failures and hypotheses](docs/07_FAILURES_LIMITATIONS_AND_HYPOTHESES.md) | phase-specific limits and qualified decisions |
+| [8. Conclusions](docs/08_FINAL_CONCLUSIONS_AND_FUTURE_WORK.md) | direct answer and future experiments |
+| [9. Reproducibility](docs/09_REPRODUCIBILITY_AND_USER_GUIDE.md) | install, assets, supported CLI and common errors |
+| [10. Evidence and references](docs/10_EVIDENCE_AND_REFERENCES.md) | original artifact hashes, verification scope and bibliography |
+
+[Result CSVs](docs/results/README.md) retain unrounded saved aggregates. Historical `docs/dayB`, `docs/member1/dayC`, release configs and recovery scripts remain under original identifiers because accepted evidence refers to them. Their pending-status paragraphs describe earlier stages; the numbered chapters provide the reconciled final account.
+
+The evidence is limited to one checkpoint/dataset, simulated precision, source rather than verified speaker separation, cumulative interventions and a partial silence control. Validation checkpoint-selection exposure, historical test-summary exposure, execution interruptions and the Member 3 acknowledgement inconsistency are disclosed. Private research references, licensed media, complete caches and sealed labels are not newly published. The integrated dashboard displays saved results and offers guarded validation-only development execution. [Cleanup report](FINAL_CLEANUP_AND_REVIEW_REPORT.md) and [rename audit](RENAMING_AND_COMPATIBILITY_REPORT.md) describe the five review branches; the project lead performs every final merge manually.

@@ -1,31 +1,41 @@
-# Member 2: dataset + forensic evaluation
+# Member 2: data preparation and statistical evaluation
 
-**Owns:** data licence and manipulation labels, source/identity-disjoint train/val/test manifest,
-offline A/V preprocessing, temporal alignment, frozen-encoder feature caching, baseline/lowp/restored
-metrics and cluster bootstrap CIs, shortcut audits.
+The final experiment evaluates whole LAV-DF videos using cached DiMoDif encoder outputs. Earlier windowed preparation files remain as historical methods; they are not the final 3,200-video manifest. The canonical cohort has 1,200 validation and 2,000 test videos, with equal counts in the four manipulation categories. Source groups are separated; `identity_id = source_id` does not verify speaker separation.
 
-Everything except the encoder feature cache runs **without PyTorch and without a model**: the evaluator
-only reads `manifest.jsonl` + prediction JSONL, so it is tested on synthetic fixtures before real
-predictions exist.
+## Current implementation
 
-| Module | What it does | Plan day |
-| --- | --- | --- |
-| `labels.py` | dataset flags → `real` / `audio_fake` / `video_fake` / `both_fake` | 1 |
-| `splits.py` | connected source+identity groups, split audit, leak repair (test never redrawn) | 2 |
-| `lavdf.py` | LAV-DF index, per-split sampling, ffmpeg clip extraction, window rules | 3–4 |
-| `manifest.py` | schema + leak validation (starter), build/read/write `manifest.jsonl` | 1–4 |
-| `predictions.py` | validate prediction rows against the schema, join on `clip_id`, no silent drops | 5 |
-| `evaluate.py` | threshold at fixed real FPR (val), cluster bootstrap CIs, per-attack-type metrics | 5–6, 10 |
-| `paired.py` | paired cluster-bootstrap deltas, restoration table with measured cost | 7–8 |
-| `seal.py` | test-set seal + access ledger | 9 |
-| `shortcuts.py` | leakage audit (silence, duration, cut position, codec) | 11 |
-| `report.py` | Markdown tables and figures | 12 |
-| `cache.py`, `preprocess.py` | frozen-encoder cache (starter); **waits for the Lead's checkpoint** | 3–4 |
+| Module | Responsibility |
+| --- | --- |
+| `labels.py`, `lavdf.py` | map modality manipulation flags; select and prepare dataset records |
+| `wholevideo.py` | whole-video manifest and media mapping for DiMoDif |
+| `dimodif_features.py` | resumable feature bookkeeping and aggregate metadata reports |
+| `manifest.py`, `splits.py` | schema and connected source-group integrity |
+| `cache.py` | legacy `.pt` feature-cache interface, retained for compatibility |
+| `predictions.py`, `readiness.py` | prediction schema, checkpoint, coverage and readiness checks |
+| `evaluate.py` | validation threshold; source-cluster bootstrap; AUROC, average precision, BCE, recall and real FPR |
+| `paired.py` | aligned paired differences using the same resampled sources in both modes |
+| `shortcut_control.py`, `shortcuts.py` | matching/auditing dataset shortcut measurements |
+| `seal.py` | explicit test-access checks and access ledger |
+| `report.py` | render stored evaluation outputs into tables and optional figures |
 
-Scripts (in `scripts/`): `m2_lavdf.py`, `m2_build_manifest.py`, `m2_evaluate.py`, `m2_paired.py`,
-`m2_audit.py`. Step-by-step commands: `docs/member2/RUNBOOK.md`. Dataset decisions: `docs/member2/DATASET.md`.
+The executable encoder pipeline is `scripts/m2_dimodif_features.py`: auto-AVSR visual/audio encoders and MediaPipe preprocessing, writing `<root>/<split>/<video_id>/features.npz` (`video_features`, `audio_features`) and `meta.json`. `preprocess.py` remains an abstract starter interface; it is not the actual encoder implementation. Do not use it as evidence that raw-video runtime is implemented.
 
-**Decisions worth reviewing:** one operating threshold, frozen on validation from the `reference`
-config at 5% real FPR and applied to all four configs; LAV-DF has no speaker IDs, so
-`identity_id = source_id` (noted in each row); `feature_path` names the planned cache file
-`data/cache/<clip_id>.pt`, created once the checkpoint is locked.
+## Supported commands
+
+Run these from the repository root after installation. `--help` is safe and requires no research assets:
+
+```bash
+python scripts/m2_lavdf.py --help
+python scripts/m2_whole_video_manifest.py --help
+python scripts/m2_dimodif_features.py --help
+python scripts/m2_check_predictions.py --help
+python scripts/m2_evaluate.py --help
+python scripts/m2_paired.py --help
+python scripts/m2_shortcut_control.py --help
+```
+
+`m2_evaluate.py calibrate` selects the reference operating threshold using validation only; `evaluate` consumes a frozen protocol. The current final protocol uses 0.6627789735794068. Never recalibrate it for reproducing the accepted study. The evaluator reads prediction files and labels; the inference runtime does not compute accuracy. Its final report extends paired outputs to real FPR and manipulation subsets; preserve that current reporting behavior alongside the older frozen scoring-source inventory.
+
+Historical `m2_` script names are retained by frozen package manifests and existing callers. Their module names already explain their functions. The `m2` prefix identifies the evaluation owner, not an obsolete version. No duplicate CLI aliases are introduced.
+
+Test with `PYTHONPATH=src python -m pytest tests/member2 -q`. These tests use synthetic inputs. The accepted held-out outputs are already saved; running tests does not authorize reopening the research test cohort. Licensed media, canonical test labels, full feature caches and private handoffs are external inputs, not files to add to a public checkout.

@@ -1,0 +1,25 @@
+# Canonical-cohort Day 10 execution plan — not authorized to run
+
+The original acknowledged Member2 release is `M2-REL-20261113-01`; its exact JSON remains unchanged under `docs/member1/dayC/releases/`. The approved cohort definition is the original canonical manifest's `split == "test"` selector, reported as 2,000 clips. The runner's historical `--ready-test-manifest` argument must point to the **same canonical file** for this contract. Both registry entries bind identical path and hash. No separate manifest is generated. Test rows are selected only after C10 and the persistent attempt claim.
+
+## Proposed runtime arrangement for C9 review
+
+Use the accepted Colab CPU environment, unchanged torch and simulated precision semantics, SDPA, batch 1 and one PyTorch/intra-op thread as recorded in the accepted context. All model/config/source/canonical files must resolve to the frozen registry paths inside the Colab execution project. The real checkpoint/config/upstream models must match their previously accepted SHA-256 values. The runtime is not available on this local Mac for actual scientific inference and has not been contacted or reverified automatically.
+
+The proposed cache policy is `configs/dayC/member1/heldout_cache_path_proposal.json`: resolve each authorized canonical test ID to `/content/afml_drive/MyDrive/AFML_Project/dimodif_emb/test/<clip_id>/features.npz` and adjacent `meta.json`. This is a filename convention, not a claim that any individual test file was inspected. The original manifest's `.pt` placeholder remains untouched. Ignore it only under the explicitly proposed split/clip resolver bound into C9 and the frozen run. No validation-only approval is silently extended. All outputs, logs, code/config changes and review ZIPs remain in the execution project's owned artifact paths; Drive caches are read-only.
+
+The proposed arrangement is subject to the genuine Member3 runtime release and lead C9 review. A runtime mismatch must stop without dependency installation or substitution. The eventual package must include the exact code and frozen input/config/anchor/approval hashes. Its final digest cannot exist until the actual C9 freeze is complete.
+
+## Integrity and one-time sequence
+
+1. Before C9, verify the actual owner releases, all opaque input identities and fresh source-test evidence. Do not open test rows/features. Present the fully complete proposal and its digest.
+2. After actual proposal-bound C9, create both final configs and the integrity anchor once. Metadata-only preflight must recheck source/input hashes and show the exact C10 context. Prepare the final Colab package and launch command using those actual files; no automatic Colab execution.
+3. After actual C10, the runner verifies release/runtime/path identities, then claims the persistent attempt lock and ledger **before** parsing the canonical test rows or touching cached tensors. Any failure afterward retains the attempt and stops without automatic retry.
+4. Check complete cohort IDs and split/metadata consistency. Under the frozen cache resolver, reject symlink/path escapes and missing metadata; inspect every expected feature file for original float32, finite `(T,768)` streams, positive lengths at most 600 and stream-length difference at most 3. Hash both feature and metadata bytes, and record acquisition identities before any model call. This full-array integrity pass is distinct from the scoring engine's one feature load per clip; it is not a new latency benchmark.
+5. Run all four frozen modes exactly once per clip through the unchanged adapter. Preserve model state/input tensors, validate probability-of-fake outputs and checkpoint identities, and recheck cache identities. No labels enter prediction outputs; no threshold tuning, test metrics or causal/equivalence claim is produced.
+6. Publish all four score files together only after complete schema/cohort validation. Re-audit saved files, provenance, lock/ledger and input/cache hashes without re-inference. Package the four test files, accepted unchanged `restore_query_val.jsonl`, checksums, public frozen references, output audit, hash-only seal evidence and owner handoff instructions.
+7. Stop at C10R after the successful local handoff. Member2 owns labeled evaluation; Member3 owns final benchmark/cost reporting.
+
+## Important identity limitation for C9 review
+
+Member2's supplied coverage report records all 3,200 metadata checks but only 2,800 full array checks before the old session dropped. No original per-file test tensor/metadata SHA inventory was supplied. C10-time full checks and acquisition hashes can establish complete coverage, schema, stable run inputs and subsequent audit identity, but cannot prove byte equivalence to an unavailable historical per-file hash inventory. This limitation is included in the policy proposal; do not describe acquisition hashes as previously approved original hashes. If an original hash inventory is later supplied, verify and bind it before freeze rather than silently changing this protocol after C9.
