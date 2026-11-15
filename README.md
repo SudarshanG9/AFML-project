@@ -5,7 +5,9 @@ Frontend integration now exists on `integration/afml-frontend`: [application gui
 
 **A controlled study of numerical precision inside a frozen audiovisual deepfake detector.**
 
-**Integration scope:** this branch completes backend Phases 1–3. Frontend integration and full final-release validation remain deferred. See the [integration report](docs/integration/PHASES_1_TO_3_REPORT.md) and [documentation authority index](docs/README.md).
+**Integration scope:** backend Phases 1–3 and frontend Phase 4 are complete. Member 1's frozen pretrained adapter/four modes, Member 2's whole-video evaluation and paired analysis, Member 3's cached-feature CLI/benchmarks/provenance, repository cleanup, research documentation, Streamlit dashboard and automated integration tests are integrated. Python 3.10 and 3.12 CI passed for Phase 4.
+
+**Final review:** Phase 5 is the current engineering gate; its [release-readiness report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) records current tests, browser checks, limitations and the decision for merge review. Any remaining browser checks, optional explicitly authorized real-validation demonstration and project-lead approval to merge into `main` must be distinguished from the completed accepted research. Earlier [Phases 1–3](docs/integration/PHASES_1_TO_3_REPORT.md) and [Phase 4](docs/integration/PHASE_4_FRONTEND_REPORT.md) reports are historical execution evidence.
 
 Can reducing precision in audiovisual fusion change forensic decisions, and can retaining precision in the value/output path repair more damage than retaining query precision at comparable measured cost? AVFuse-CausalQ investigates that question using pretrained **DiMoDif**, whole **LAV-DF** videos, four frozen precision configurations, source-grouped statistics and CPU cached-feature benchmarks.
 
@@ -51,9 +53,19 @@ Accepted typical CPU model p50 latencies are 118.454/161.434/119.918/167.474 ms 
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
+python -m pip install -r frontend/requirements.txt
 python -m avfuse.member3_runtime.cli --help
 python -m avfuse.member3_runtime.cli --smoke
 ```
+
+Launch the dashboard from the repository root after installing dependencies:
+
+```bash
+cd frontend
+PYTHONPATH=../src:. python -m streamlit run app.py --server.address 127.0.0.1
+```
+
+The [frontend guide](frontend/README.md) explains `AVFUSE_REPO_ROOT`, authorized external asset roots and server-side uploads. The app does not execute real inference on launch.
 
 The smoke command is a synthetic wiring check. Real validation inference requires a separately supplied DiMoDif checkout/checkpoint, validation manifest and compatible feature cache. The runtime consumes **cached encoder features**, not arbitrary raw video. See the [step-by-step user guide](docs/09_REPRODUCIBILITY_AND_USER_GUIDE.md) for asset hashes, supported commands and validation-only demonstrations.
 
@@ -74,4 +86,4 @@ The smoke command is a synthetic wiring check. Real validation inference require
 
 [Result CSVs](docs/results/README.md) retain unrounded saved aggregates. Historical `docs/dayB`, `docs/member1/dayC`, release configs and recovery scripts remain under original identifiers because accepted evidence refers to them. Their pending-status paragraphs describe earlier stages; the numbered chapters provide the reconciled final account.
 
-The evidence is limited to one checkpoint/dataset, simulated precision, source rather than verified speaker separation, cumulative interventions and a partial silence control. Validation checkpoint-selection exposure, historical test-summary exposure, execution interruptions and the Member 3 acknowledgement inconsistency are disclosed. Private research references, licensed media, complete caches and sealed labels are not newly published. The frontend is untouched. [Cleanup report](FINAL_CLEANUP_AND_REVIEW_REPORT.md) and [rename audit](RENAMING_AND_COMPATIBILITY_REPORT.md) describe the five review branches; the project lead performs every final merge manually.
+The evidence is limited to one checkpoint/dataset, simulated precision, source rather than verified speaker separation, cumulative interventions and a partial silence control. Validation checkpoint-selection exposure, historical test-summary exposure, execution interruptions and the Member 3 acknowledgement inconsistency are disclosed. Private research references, licensed media, complete caches and sealed labels are not newly published. The integrated dashboard displays saved results and offers guarded validation-only development execution. [Cleanup report](FINAL_CLEANUP_AND_REVIEW_REPORT.md) and [rename audit](RENAMING_AND_COMPATIBILITY_REPORT.md) describe the five review branches; the project lead performs every final merge manually.

@@ -1,6 +1,6 @@
 # Backend integration review for the AVFuse-CausalQ dashboard
 
-Historical frontend-source review (November 14). Current integration authority is [INTEGRATION.md](INTEGRATION.md) and the [Phase 4 report](../docs/integration/PHASE_4_FRONTEND_REPORT.md).
+Historical frontend-source review (November 14). Current integration authority is [INTEGRATION.md](INTEGRATION.md) and the [Phase 5 release-readiness report](../docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md).
 
 Repository: SudarshanG9/AFML-project
 Review date: 2026-11-14
