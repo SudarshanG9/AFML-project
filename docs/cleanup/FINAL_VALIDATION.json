@@ -1,0 +1,97 @@
+{
+  "date": "2026-11-15",
+  "common_base": "18d4af3fa05c9453eafb4666f78f0d5867bc3437",
+  "suite": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python3 -m pytest -q -p no:cacheprovider",
+    "tests": 1100,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 22,
+    "passed": 1078,
+    "seconds": 43.74,
+    "scope": "Composed five-workstream final tree; synthetic software checks, no held-out evaluation"
+  },
+  "cli_checks": [
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli --smoke",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli validate-config --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli predict --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli run --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli benchmark --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 -m avfuse.member3_runtime.cli inspect --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 scripts/check_environment.py --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 scripts/validate_manifest.py --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 scripts/m2_check_predictions.py --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 scripts/m2_evaluate.py --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 scripts/m2_paired.py --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 scripts/m2_whole_video_manifest.py --help",
+      "returncode": 0
+    },
+    {
+      "command": "python3 scripts/m2_dimodif_features.py --help",
+      "returncode": 0
+    }
+  ],
+  "local_markdown_links": {
+    "checked": 56,
+    "broken": []
+  },
+  "evidence_checks": {
+    "test_overall_metric_cells": 60,
+    "paired_results_verified": 80,
+    "paired_nominal_exclusions": 1,
+    "frozen_production_config_contract_files_unchanged": 42,
+    "frontend_paths_changed": [],
+    "frontend_static_paths_available": 9,
+    "original_figures_byte_identical": 2,
+    "new_private_assets_copied": false,
+    "heldout_inference_evaluation_or_new_research_benchmark": false
+  },
+  "private_asset_skips": "19 historical fixture-dependent cases plus 3 optional-dependency cases",
+  "frontend_validation": "Static API/path inspection only; frontend files untouched",
+  "real_asset_inference": "Not run; supplied-asset examples reviewed against actual parser/source",
+  "research_documents": {
+    "chapters": 10,
+    "root_readme": true,
+    "claim_records": 27,
+    "naming_decisions": 31
+  },
+  "remote_publish_policy": "Only five new cleanup branch refs; existing branches preserved; no merges"
+}
