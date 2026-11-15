@@ -9,7 +9,7 @@ import plotly.express as px
 import streamlit as st
 
 from .data_access import (
-    CONFIGS, documented_validation_table, documented_test_results, documented_benchmark_summary, dimodif_npz_inspection_path,
+    CONFIGS, documented_benchmark_summary, dimodif_npz_inspection_path,
     human_bytes, load_json, load_jsonl, manifest_summary, parse_jsonl_text,
     prediction_summary, shortcut_audit_summary, feature_file_summary_bytes, documented_shortcut_table,
     validate_benchmarks, validate_manifest, validate_metrics_report, validate_predictions,
@@ -70,6 +70,8 @@ def card(label: str, value: str, foot: str = "") -> None:
 
 
 def read_uploaded(upload: Any) -> str:
+    if len(upload.getvalue()) > 32 * 1024 * 1024:
+        raise ValueError("Upload exceeds 32 MiB limit")
     return upload.getvalue().decode("utf-8-sig")
 
 
@@ -77,6 +79,7 @@ def load_jsonl_with_error(path: Path, label: str) -> list[dict[str, Any]]:
     try:
         return load_jsonl(path)
     except Exception as exc:
+        st.session_state["artifact_import_failed"] = True
         st.error(f"Could not read {label} `{path.name}`: {type(exc).__name__}: {exc}")
         return []
 
@@ -85,6 +88,7 @@ def parse_uploaded_jsonl_with_error(upload: Any, label: str) -> list[dict[str, A
     try:
         return parse_jsonl_text(read_uploaded(upload))
     except Exception as exc:
+        st.session_state["artifact_import_failed"] = True
         st.error(f"Could not parse uploaded {label} `{upload.name}`: {type(exc).__name__}: {exc}")
         return []
 
@@ -132,6 +136,15 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
     page_header("AVFUSE-CAUSALQ / RESEARCH WORKSPACE", "Experiment overview",
                 "A local, artifact-driven dashboard for precision-controlled audio-visual fusion experiments.")
     status = inspect_backend(root)
+    with st.expander("Separate readiness states"):
+        st.json({key: status[key] for key in ("source_available", "interfaces_imported", "software_checked", "assets_available", "execution_authorized", "run_completed", "artifact_integrity_verified")})
+    st.info("Accepted study completed: overall precision damage and V/output superiority were not statistically established. This dashboard does not automatically reproduce the study.")
+    last = st.session_state.get("last_run_result")
+    if last:
+        st.json(last)
+    verified = st.session_state.get("verified_runs", {})
+    passed = sum(v.get("ok") is True for v in verified.values())
+    st.caption(f"Integrity-passed runs in this session: {passed}; discovered runs without a recorded passing check: {max(0, len(files['run_dirs']) - passed)}. Checks describe the time of verification.")
     git = git_info(root)
     st.markdown("<div class='avf-warn'><b>Research integrity:</b> this dashboard never invents metrics. Empty states mean the corresponding artifact is not present locally. Simulated INT8 is floating-point fake quantization, not an INT8 kernel.</div>", unsafe_allow_html=True)
     st.write("")
@@ -146,7 +159,7 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
         ("Prediction files", str(prediction_count), "local JSONL files"),
         ("Benchmark files", str(benchmark_count), "local JSONL files"),
         ("Evaluation reports", str(metrics_count), "structured metrics.json"),
-        ("Finalized runs", str(run_count), "run_manifest.json found"),
+        ("Run manifests", str(run_count), "presence only; integrity unverified"),
     ]
     for col, (label, value, foot) in zip(cols, metrics):
         with col:
@@ -192,6 +205,8 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
 
 
 def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
+    st.session_state["artifact_import_failed"] = False
+    st.info("Accepted whole-video study: validation 1,200; test 2,000. These are recorded cohort sizes, not a claim of local asset availability. Source disjointness does not establish speaker disjointness.")
     page_header("DATA / INPUT CONTRACT", "Dataset & cached features",
                 "Inspect the manifest and the feature-cache boundary without uploading or decoding raw media.")
     st.markdown("<div class='avf-note'><b>Input rule:</b> the experiment operates on post-encoder audio/video features. Raw AV decoding and feature extraction belong to Member 2's offline pipeline and are not repeated during precision sweeps.</div>", unsafe_allow_html=True)
@@ -261,7 +276,7 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
         if feature_layout == "dimodif_npz":
             npz_feature_root = st.text_input(
                 "DiMoDif feature root", value=default_npz_root, key="npz_feature_inspection_root",
-                help="The loader looks under <root>/<split>/<clip_id>/features.npz. Use a path inside this repository for local inspection.",
+                help="The loader looks under <root>/<split>/<clip_id>/features.npz. External roots must be authorized by the server operator through AVFUSE_ASSET_ROOTS.",
             )
             try:
                 feature_path = dimodif_npz_inspection_path(
@@ -284,8 +299,10 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
         feature_inside_repo = False
         if feature_path is not None:
             try:
-                feature_inside_repo = feature_path.is_relative_to(root.resolve())
-            except OSError:
+                from .data_access import authorized_path
+                authorized_path(root, feature_path)
+                feature_inside_repo = True
+            except (OSError, ValueError):
                 feature_path_error = "The feature path could not be resolved safely."
         uploaded_feature = st.file_uploader("Optionally import one feature cache for metadata inspection", type=["npz", "pt"], key="feature_metadata_upload")
         if uploaded_feature is not None:
@@ -295,8 +312,10 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
                     st.json(info)
                 except Exception as exc:
                     st.error(f"Feature inspection failed: {type(exc).__name__}: {exc}")
+        elif selected_row.get("split") == "test":
+            st.warning("Test cache inspection is disabled; only saved aggregate test results are displayed.")
         elif feature_path is not None and feature_inside_repo and feature_path.is_file():
-            st.caption(f"Feature path: {feature_path.relative_to(root.resolve())}")
+            st.caption(f"Feature path: {feature_path}")
             if st.button("Inspect cached feature shapes", key="inspect_feature"):
                 try:
                     from .data_access import feature_file_summary
@@ -305,7 +324,7 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
                 except Exception as exc:
                     st.error(f"Feature inspection failed: {type(exc).__name__}: {exc}")
         elif feature_path is not None and not feature_inside_repo:
-            st.warning("The feature path resolves outside the selected repository; the dashboard will not read paths outside the checkout.")
+            st.warning("The feature path is outside the server-authorized roots; inspection is blocked.")
         elif feature_path_error:
             st.warning(feature_path_error)
         else:
@@ -409,6 +428,7 @@ def _load_optional_json_artifact(root: Path, label: str, paths: list[Path], key:
 
 
 def render_diagnostics(root: Path, files: dict[str, list[Path]]) -> None:
+    st.caption("Five joint self-attention layers. Dense score-matrix size is theoretical, not measured peak memory. Modality ablations diagnose input dependence; they do not isolate causal cross-modal dependence.")
     page_header("FUSION / MEMBER 1 DIAGNOSTICS", "Fusion diagnostics",
                 "Inspect the backend's modality-ablation, attention-boundary, dense-memory estimate and padding/mask reports. These are diagnostics, not benchmark accuracy results.")
     st.markdown("<div class='avf-note'><b>Interpretation guard:</b> the Day 2 attention audit inspects a joint-sequence self-attention block in the DiMoDif detector. The score-matrix size is a theoretical dense estimate, not the memory allocated by fused SDPA. No diagnostic artifact by itself establishes end-to-end inference performance.</div>", unsafe_allow_html=True)
@@ -513,27 +533,28 @@ def render_diagnostics(root: Path, files: dict[str, list[Path]]) -> None:
 
 
 def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
+    st.session_state["artifact_import_failed"] = False
     page_header("INFERENCE / CLIP INSPECTION", "Demo & predictions",
                 "Run validation-only cached-feature inference through the real Member 3 CLI, then inspect its prediction artifacts.")
     status = inspect_backend(root)
     st.markdown("<div class='avf-warn'><b>Input boundary:</b> this runs the pretrained detector on cached encoder features, not raw video/audio. The intervention modes use floating-point fake quantization, not an INT8 integer kernel. The UI never opens the held-out test split.</div>", unsafe_allow_html=True)
     st.subheader("Run real cached-feature validation")
+    st.caption("Server operator must authorize external roots with AVFUSE_ASSET_ROOTS before launch.")
     if not status["real_inference_ready"]:
         st.error("The required four-mode adapter or Member 3 CLI components were not detected in this checkout.")
     else:
         st.info("This form runs the checked-in CLI on the validation split only. It validates paths/configuration first, then writes a run folder with predictions and a cached-feature benchmark.")
-        manifest_options = files.get("manifests", [])
-        default_manifest = str(manifest_options[0].relative_to(root)) if manifest_options and manifest_options[0].is_relative_to(root) else (str(manifest_options[0]) if manifest_options else "data/pilot/test_day2/manifest_rows.jsonl")
+        default_manifest = ""
         with st.form("real_cached_feature_run"):
             upstream_root = st.text_input("External DiMoDif checkout (contains src/models.py and ckpt/)", placeholder="Path to your local DiMoDif repository")
-            checkpoint_name = st.selectbox("Checkpoint", ["lavdf", "avdeepfake1m"], index=0)
+            checkpoint_name = st.selectbox("Checkpoint", ["lavdf"], index=0)
             manifest_path = st.text_input("Whole-video manifest JSONL", value=default_manifest)
             feature_root = st.text_input("Feature root", value=".", help="For shared_pt this resolves manifest feature_path entries; for dimodif_npz it is the parent of <split>/<clip_id>/features.npz.")
             feature_format = st.selectbox("Feature format", ["shared_pt", "dimodif_npz"], index=0)
             device = st.selectbox("Execution device (no automatic fallback)", ["cpu", "cuda", "cuda:0", "mps"], index=0)
             modes = st.multiselect("Precision configurations", list(CONFIGS), default=list(CONFIGS), format_func=lambda value: CFG_LABELS.get(value, value))
-            require_hash = st.checkbox("Require the agreed LAV-DF checkpoint SHA-256", value=True, disabled=checkpoint_name != "lavdf")
-            run_id = st.text_input("Optional run ID", value="")
+            require_hash = st.checkbox("Require the agreed LAV-DF checkpoint SHA-256", value=True, disabled=True)
+            run_id = st.text_input("Unique run ID (required)", value="")
             experiment_id = st.text_input("Optional experiment ID", value="")
             confirm_inputs = st.checkbox("I have verified that this machine has the external checkpoint and local feature files; run validation only.", value=False)
             submitted = st.form_submit_button("Validate inputs and run validation experiment", disabled=not status["real_inference_ready"])
@@ -551,17 +572,27 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
                 st.error("The manifest JSONL file was not found.")
             elif not feature_root.strip() or not features.is_dir():
                 st.error("The feature root directory was not found.")
+            elif not run_id or run_id in st.session_state.get("submitted_runs", set()):
+                st.error("Enter a new unique run ID; previously submitted IDs cannot execute twice in this session.")
             elif not modes:
                 st.error("Select at least one precision configuration.")
             elif not confirm_inputs:
                 st.warning("Confirm the local checkpoint and feature inputs before starting the run.")
             else:
+                st.session_state.setdefault("submitted_runs", set()).add(run_id)
                 with st.spinner("Validating configuration and running the selected validation modes..."):
-                    code, output = run_cached_feature_experiment(
+                    outcome = run_cached_feature_experiment(
                         root, upstream_root=str(upstream.resolve()), checkpoint_name=checkpoint_name,
                         manifest=str(manifest.resolve()), feature_root=str(features.resolve()),
                         feature_format=feature_format, device=device, modes=modes,
                         run_id=run_id, experiment_id=experiment_id, require_lavdf_hash=require_hash)
+                st.session_state["last_run_result"] = {"exit_code": outcome.code, **outcome.payload}
+                code, output = outcome
+                if outcome.payload:
+                    st.json(outcome.payload)
+                from avfuse.member3_runtime.cli import EXIT_NAMES
+                st.write(f"Backend state: {EXIT_NAMES.get(code, 'TIMEOUT' if code == 124 else 'UNKNOWN')}")
+                files.update(__import__("avfuse_ui.data_access", fromlist=["discover_files"]).discover_files(root))
                 if code == 0:
                     st.success("Backend CLI exited successfully. Evaluate predictions with Member 2 before making research claims.")
                 else:
@@ -580,6 +611,9 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
     elif selected_paths:
         rows = [row for selected_path in selected_paths for row in load_jsonl_with_error(selected_path, "prediction JSONL")]
         source = ", ".join(str(p.relative_to(root)) if p.is_relative_to(root) else str(p) for p in selected_paths)
+    if st.session_state.get("artifact_import_failed"):
+        st.warning("Import incomplete: at least one selected file failed; comparisons are disabled.")
+        return
     if rows:
         errors = validate_predictions(rows, root / "contracts/schemas/prediction.schema.json")
         st.caption(f"Source: {source} · {len(rows):,} prediction rows")
@@ -589,6 +623,12 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
                 st.code("\n".join(errors[:50]))
         else:
             st.success("Prediction rows match the current schema; labels remain outside the prediction records.")
+        if errors:
+            return
+        identities = sorted({(str(r.get("run_id")), str(r.get("split")), str(r.get("checkpoint_sha256"))) for r in rows})
+        identity = st.selectbox("Prediction identity (run, split, checkpoint)", identities)
+        st.caption("Dataset identity must be confirmed from the run provenance; prediction rows alone do not establish it.")
+        rows = [r for r in rows if (str(r.get("run_id")), str(r.get("split")), str(r.get("checkpoint_sha256"))) == identity]
         df = pd.DataFrame(prediction_summary(rows))
         st.dataframe(df, use_container_width=True, hide_index=True)
         numeric = [r for r in rows if isinstance(r.get("score_fake"), (int, float))]
@@ -665,12 +705,32 @@ def _metric_value(metric: Any) -> tuple[float | None, str]:
 def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
     page_header("FORENSIC EVALUATION / MEMBER 2", "Evaluation results",
                 "Overall and manipulation-stratified metrics, with validation-frozen thresholds and source-cluster confidence intervals.")
+    display_mode = st.radio("Evaluation source", ["Saved research results", "Imported evaluation artifact"])
+    if display_mode == "Saved research results":
+        from .data_access import saved_result_table
+        st.info("Saved research results: committed source-bound aggregate presentations; no evaluation is executed.")
+        st.warning("Overall precision damage and V/output superiority were not statistically established. Confidence intervals crossing zero do not prove equivalence.")
+        st.caption("Frozen threshold 0.6627789735794068; source-cluster bootstrap. Fake INT8 uses floating-point arithmetic. Source groups are not verified speaker identities; checkpoint-selection and historical test-summary exposure limit interpretation.")
+        for filename in ("test_overall_metrics.csv", "test_manipulation_metrics.csv", "test_paired_comparisons.csv", "validation_overall_metrics.csv"):
+            with st.expander(filename, expanded=filename == "test_overall_metrics.csv"):
+                try:
+                    records = saved_result_table(root, filename)
+                    st.caption(f"{len(records)} saved records; source_sha256 identifies the original evidence. Paired delta = mode_b minus mode_a.")
+                    st.dataframe(pd.DataFrame(records), use_container_width=True, hide_index=True)
+                except (OSError, ValueError) as exc:
+                    st.warning(f"Saved table unavailable: {exc}")
+        figures = list((root / "docs/member2/results/test_figures").glob("*.png"))
+        for figure in figures:
+            st.image(str(figure), caption=f"Original saved figure: {figure.name}")
+        return
     path, upload = choose_local_or_upload(root, "metrics.json", files["metrics"], "metrics", ["json"])
     report = None
     source = None
     if upload:
         try:
             report = json.loads(read_uploaded(upload))
+            if not isinstance(report, dict):
+                raise ValueError("Expected a metrics JSON object")
             source = f"uploaded: {upload.name} (session only)"
         except Exception as exc:
             st.error(f"Could not parse metrics JSON: {exc}")
@@ -680,55 +740,16 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
             source = str(path)
         except Exception as exc:
             st.error(f"Could not read metrics report: {type(exc).__name__}: {exc}")
-    # A committed held-out summary is documentation, not a freshly loaded metrics.json artifact.
-    test_doc = root / "docs/member2/results/TEST_RESULTS.md"
-    if test_doc.is_file():
-        text = test_doc.read_text(encoding="utf-8", errors="replace")
-        documented = documented_test_results(text)
-        if documented["rows"]:
-            meta = documented["metadata"]
-            st.info("Showing Member 2's committed held-out test summary. These are documented results, not a newly computed evaluation or a verified live prediction import.")
-            st.caption(f"Documentation source: {test_doc.relative_to(root)} · Reported prediction run: {meta.get('run_id', 'not stated')}")
-            if meta.get("total_test_videos"):
-                st.write(f"**Reported test cohort:** {meta['total_test_videos']:,} videos · **Source groups:** {meta.get('source_groups', 'not stated'):,}")
-            if meta.get("threshold") is not None:
-                st.write(f"**Validation-frozen threshold:** {meta['threshold']:.6f} · **Bootstrap:** {meta.get('bootstrap_resamples', 'not stated')} resamples, seed {meta.get('bootstrap_seed', 'not stated')}")
-            table = []
-            for row in documented["rows"]:
-                table.append({
-                    "Configuration": CFG_LABELS.get(row["config"], row["config"]),
-                    "AUROC": f"{row['auroc']:.4f} [{row['auroc_ci_low']:.4f}, {row['auroc_ci_high']:.4f}]",
-                    "AUPRC": f"{row['auprc']:.4f}", "BCE": f"{row['bce']:.4f}",
-                    "Recall": f"{row['recall']:.3f}", "Real FPR": f"{row['real_fpr']:.3f}",
-                })
-            panel_title("Published held-out results", "Transcribed from Member 2's checked-in report; AUROC confidence intervals are shown as published.")
-            st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
-            per_type = documented.get("per_type", [])
-            if per_type:
-                with st.expander("Reference performance by manipulation type"):
-                    st.dataframe(pd.DataFrame([{
-                        "Manipulation": row["manipulation_type"].replace("_", " "),
-                        "AUROC": row["auroc"], "Recall": row["recall"],
-                    } for row in per_type]), use_container_width=True, hide_index=True)
-            paired = documented.get("paired_bce", [])
-            if paired:
-                with st.expander("Paired BCE contrasts — supporting analysis"):
-                    st.caption("Intervals crossing zero are inconclusive; they do not establish equivalence.")
-                    st.dataframe(pd.DataFrame([{
-                        "Contrast": row["contrast"], "Delta BCE": row["delta_bce"],
-                        "95% CI": f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}]",
-                        "CI excludes zero": row["ci_low"] > 0 or row["ci_high"] < 0,
-                    } for row in paired]), use_container_width=True, hide_index=True)
-            st.warning("Report limitations: simulated INT8 uses floating-point arithmetic; no hardware speedup is established. Source groups do not prove speaker independence, duration was not controlled, and test-label-derived summaries were inspected before freeze. The report records three inference attempts, including a failed pre-scoring attempt and a stopped attempt.")
-            with st.expander("Read the complete Member 2 test report"):
-                st.markdown(text)
-            st.caption("For machine-readable paired metrics, import the corresponding structured metrics JSON when available. This documentation view does not synthesize missing confidence intervals or prediction files.")
     if report:
         errors = validate_metrics_report(report)
+        if errors:
+            st.error("Metrics report structure needs review: " + "; ".join(errors[:8]))
+            return
         split = report.get("split")
         st.caption(f"Source: {source} · split: {split}")
         if errors:
             st.error("Metrics report structure needs review: " + "; ".join(errors[:8]))
+            return
         configs = report.get("configs", {})
         if not isinstance(configs, dict):
             st.error("Cannot display this report because `configs` is not an object.")
@@ -758,7 +779,7 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
             row["Clips"] = block.get("n")
             row["Source clusters"] = block.get("n_clusters")
             metric_rows.append(row)
-        panel_title("Overall results", "Each CI is a source/identity-cluster bootstrap interval, not an independent-clip interval.")
+        panel_title("Overall results", "Each CI is a source-cluster bootstrap interval, not an independent-clip interval.")
         st.dataframe(pd.DataFrame(metric_rows), use_container_width=True, hide_index=True)
         if path is not None:
             report_dir = path.parent
@@ -809,28 +830,27 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
                 st.dataframe(pd.DataFrame(p_rows), use_container_width=True, hide_index=True)
         st.caption(f"Bootstrap resamples: {report.get('n_boot', 'not recorded')} · seed: {report.get('seed', 'not recorded')} · manifest SHA-256: {report.get('manifest_sha256', 'not recorded')}")
         return
-    # Structured metrics may not have been committed. Show the repo's documented validation snapshot as documentation, not as a fresh artifact.
-    doc = root / "docs/member2/results/VAL_4MODE_RESULTS.md"
-    if doc.is_file():
-        text = doc.read_text(encoding="utf-8", errors="replace")
-        parsed = documented_validation_table(text)
-        if parsed:
-            st.info("No structured `metrics.json` was found. The table below is parsed from the repository's documented validation summary; it is not a newly loaded machine-readable report and it is not the held-out test result.")
-            st.caption(f"Documentation source: {doc.relative_to(root)}")
-            st.dataframe(pd.DataFrame(parsed), use_container_width=True, hide_index=True)
-            st.markdown("**Interpretation recorded in the source document:** all four validation configurations have the same rounded AUROC/AUPRC/recall values; paired BCE confidence intervals cross zero. This supports a validation-set robustness observation, not a claim that targeted restoration rescues degradation. Test-set results are still needed for the final claim.")
-            with st.expander("Read validation documentation"):
-                st.markdown(text)
-            return
-    st.info("No structured metrics.json found. Import one or generate it using Member 2's `scripts/m2_evaluate.py evaluate` workflow after valid predictions and a frozen protocol exist.")
-    st.caption("Metrics JSON contract: split, threshold, test_accesses_so_far, n_boot, seed, manifest_sha256, per-config overall/per-type blocks, and paired comparisons.")
+    st.info("No evaluation available: select a structured metrics.json or choose Saved research results.")
 
 
 def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
+    st.session_state["artifact_import_failed"] = False
     page_header("RUNTIME / MEMBER 3", "Benchmark explorer",
                 "Read the Member 3 benchmark records without conflating operator, cached-feature model, or preprocessing costs.")
     st.markdown("<div class='avf-warn'><b>Precision disclosure:</b> all non-reference configurations are simulated fake quantization in floating-point arithmetic. The runtime records do not measure a real INT8 kernel or prove INT8 hardware speedup.</div>", unsafe_allow_html=True)
 
+    display_mode = st.radio("Benchmark source", ["Saved CPU research results", "Imported benchmark records"])
+    if display_mode == "Saved CPU research results":
+        from .data_access import saved_result_table
+        st.info("Saved CPU evidence: cached_feature_model scope; three workloads × four modes. Not raw-video end-to-end latency or native INT8 acceleration. Peak CPU memory was not measured.")
+        for filename in ("cpu_model_runtime.csv", "cpu_model_timing_samples.csv"):
+            try:
+                records = saved_result_table(root, filename)
+                st.caption(f"{filename}: {len(records)} accepted records; original source hashes retained.")
+                st.dataframe(pd.DataFrame(records), use_container_width=True, hide_index=True)
+            except (OSError, ValueError) as exc:
+                st.warning(f"Saved evidence unavailable: {exc}")
+        return
     with st.expander("Documented benchmark snapshot (optional report upload)"):
         report = st.file_uploader(
             "Upload a Markdown benchmark report",
@@ -869,8 +889,16 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
         st.markdown("- `operator`: isolated fusion attention only\n- `cached_feature_model`: cached-feature fusion + head\n- `preprocessing_once`: raw-media preprocessing, reported separately")
         st.caption("CPU and MPS peak memory are represented as null / not measured by the backend; do not plot them as zero.")
         return
+    if st.session_state.get("artifact_import_failed"):
+        st.warning("Import incomplete: at least one selected file failed; comparisons are disabled.")
+        return
     schema = root / "contracts/schemas/benchmark.schema.json"
-    errors = validate_benchmarks(rows, schema)
+    errors = []
+    if uploads:
+        errors = validate_benchmarks(rows, schema)
+    else:
+        for selected_path in selected_paths:
+            errors.extend(validate_benchmarks(load_jsonl_with_error(selected_path, "benchmark JSONL"), schema, run_dir=selected_path.parent))
     st.caption(f"Source: {source} · {len(rows)} benchmark record(s). Local discovery includes both `artifacts/benchmarks/*.jsonl` and finalized run bundles' `benchmark_records.jsonl`.")
     st.warning("The checked-in benchmark schema is documented as proposed v0.2 and pending cross-member review. Validation below means schema-conforming to the current file, not that the contract has been finally approved.")
     if errors:
@@ -880,7 +908,7 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
         st.info("The benchmark explorer stops here for nonconforming rows so it does not silently chart malformed fields. Correct the JSONL against the checked-in schema and re-import it.")
         return
     else:
-        st.success("All records validate against the checked-in benchmark schema v0.2 proposal.")
+        st.success("Records passed backend schema and cross-field checks, including available timing samples.")
     df = pd.DataFrame(rows)
     if df.empty:
         return
@@ -901,14 +929,14 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
     for col in ("p50_ms", "p95_ms", "mean_ms", "peak_memory_bytes", "conversion_overhead_ms"):
         if col in view:
             view[col] = pd.to_numeric(view[col], errors="coerce")
-    p50_values = view.get("p50_ms", pd.Series(dtype=float)).dropna()
-    p95_values = view.get("p95_ms", pd.Series(dtype=float)).dropna()
     mem_values = view.get("peak_memory_bytes", pd.Series(dtype=float)).dropna()
     c = st.columns(3)
     c[0].metric("Series", f"{len(view):,}")
-    c[1].metric("Median p50", f"{p50_values.median():.3f} ms" if len(p50_values) else "Not available")
+    c[1].metric("Latency", "See identity groups")
     c[2].metric("Peak memory", human_bytes(mem_values.max()) if len(mem_values) else "Not measured")
-    group_columns = [column for column in ("scope", "device", "config") if column in view.columns]
+    group_columns = [column for column in ("run_id", "scope", "device", "backend", "config", "workload") if column in view.columns]
+    if "workload" in view:
+        view["workload"] = view["workload"].map(lambda value: json.dumps(value, sort_keys=True))
     if group_columns:
         grouped = view.groupby(group_columns, dropna=False)
         comparison = grouped.size().rename("Records").to_frame()
@@ -918,11 +946,6 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
         with st.expander("Grouped benchmark comparison", expanded=True):
             st.dataframe(comparison.reset_index(), use_container_width=True, hide_index=True)
             st.caption("Group values are medians of the per-record p50/p95 measurements shown in the JSONL. They are not pooled per-call percentiles; compare only records with matching scope, device and workload.")
-    if len(view) and {"config", "p50_ms", "p95_ms"}.issubset(view.columns):
-        chart_df = view.melt(id_vars=[c for c in ("config","scope","device") if c in view], value_vars=[c for c in ("p50_ms","p95_ms") if c in view], var_name="Latency statistic", value_name="Latency (ms)")
-        fig = px.bar(chart_df, x="config", y="Latency (ms)", color="Latency statistic", barmode="group", facet_col="scope" if "scope" in view and view["scope"].nunique()>1 else None, template="plotly_dark")
-        fig.update_layout(height=390, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10,r=10,t=35,b=10))
-        st.plotly_chart(fig, use_container_width=True)
     display_cols = [c for c in ("run_id","config","scope","device","backend","batch_size","warmup","repeats","p50_ms","p95_ms","peak_memory_bytes","memory_method","conversion_overhead_ms","conversion_overhead_included_in_latency") if c in view]
     st.dataframe(view[display_cols], use_container_width=True, hide_index=True)
     if "workload" in view:
@@ -937,18 +960,19 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
     page_header("REPRODUCIBILITY / MEMBER 3", "Runs & system",
                 "Inspect environment diagnostics, saved configuration snapshots, hashes and artifact-integrity checks.")
     run_dirs = files.get("run_dirs", [])
-    finalized_runs = [path for path in run_dirs if (path / "run_manifest.json").is_file()]
+    finalized_runs = run_dirs
+    st.caption("Run counts are discovery counts. Validated runs: not counted until explicit integrity checks; all discovered runs remain unverified in this view.")
     provenance_count = sum((path / "provenance.json").is_file() for path in finalized_runs)
     hash_manifest_count = sum((path / "integrity" / "artifact_hashes.json").is_file() for path in finalized_runs)
     status_cols = st.columns(5)
     for col, label, value in zip(
         status_cols,
-        ("Environment reports", "Finalized run bundles", "Provenance files", "Artifact hash manifests", "Stage profiles"),
+        ("Environment reports", "Discovered run directories", "Provenance files", "Artifact hash manifests", "Stage profiles"),
         (len(files.get("environment_reports", [])), len(finalized_runs), provenance_count,
          hash_manifest_count, len(files.get("stage_profiles", []))),
     ):
         col.metric(label, value)
-    st.caption("These counts show artifact availability only. Integrity is actually checked when a run is selected below; a present hash manifest is not itself a passing verification.")
+    st.caption("These counts show artifact availability only. Integrity is checked only by the verification button below; a present hash manifest is not itself a passing verification.")
     col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("Environment diagnostics")
@@ -985,6 +1009,10 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
                 except Exception as exc:
                     st.error(f"Could not parse run manifest: {exc}")
                     run_manifest = {}
+                for summary_name in ("execution_summary.json", "failure_summary.json"):
+                    if (run_dir / summary_name).is_file():
+                        st.json(load_json(run_dir / summary_name))
+                st.caption("Integrity hashes detect changes; they do not authenticate authorship. Failed or partial execution remains incomplete even if hashes pass.")
                 st.write(f"**Run ID:** {run_manifest.get('run_id', run_dir.name)}")
                 st.write(f"**Artifacts listed:** {len(run_manifest.get('artifacts', []))}")
                 try:
@@ -992,7 +1020,12 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
                     src = str(root / "src")
                     if src not in sys.path: sys.path.insert(0, src)
                     from avfuse.member3_runtime.artifacts import verify_run_integrity
+                    if not st.button("Verify selected run integrity", key="verify_run"):
+                        st.info("Integrity not checked. Manifest presence alone does not prove finalization or integrity.")
+                        st.json(run_manifest)
+                        return
                     verdict = verify_run_integrity(run_dir)
+                    st.session_state.setdefault("verified_runs", {})[str(run_dir)] = verdict
                     if verdict.get("ok"):
                         st.success("Run artifact integrity check passed.")
                     else:
@@ -1010,6 +1043,12 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
                             st.json(load_json(artifact_path))
             else:
                 st.warning("Selected folder has no run_manifest.json; it is not a finalized Member 3 run bundle.")
+                for filename in ("failure_summary.json", "execution_summary.json"):
+                    if (run_dir / filename).is_file():
+                        try:
+                            st.json(load_json(run_dir / filename))
+                        except (OSError, ValueError) as exc:
+                            st.error(str(exc))
         else:
             st.caption("No finalized run folders found under artifacts/runs/run-*.")
     st.divider()
@@ -1056,10 +1095,10 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
 
 def render_import_help(root: Path) -> None:
     page_header("LOCAL FILE WORKFLOW", "Artifact import & file handling",
-                "The dashboard reads research artifacts from the local repository or from files you explicitly import into the browser session.")
+                "The dashboard reads research artifacts from the local repository or from files uploaded to the Streamlit server. Remote uploads do not remain exclusively on your device.")
     st.markdown("<div class='avf-note'><b>Local file handling:</b> imported JSON/JSONL files are parsed by the Streamlit process for the current session and are not copied into Git or persisted by this dashboard. Run Streamlit locally or use only a trusted host: if this app is served remotely, the selected files are received by that host. Move canonical files into the repository's documented data/ or artifacts/ folders for automatic discovery on the next launch.</div>", unsafe_allow_html=True)
     st.subheader("Supported file types")
-    st.table(pd.DataFrame([
+    st.dataframe(pd.DataFrame([
         {"File": "manifest*.jsonl", "Purpose": "Clip IDs, dataset, source/identity groups, split, label, manipulation type and local feature path"},
         {"File": "predictions*.jsonl", "Purpose": "One score_fake row per clip × precision configuration; labels remain outside this file"},
         {"File": "metrics.json", "Purpose": "Member 2 overall/per-type metrics, cluster-bootstrap CIs and paired comparisons"},
