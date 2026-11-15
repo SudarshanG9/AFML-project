@@ -28,7 +28,7 @@ def main() -> None:
             warmup=2,
             repeats=5,
         )
-    print(f"{mode:22s} fake-score={float(score.item()):.4f}  p50={timing['p50_ms']:.3f} ms")
+        print(f"{mode:22s} fake-score={float(score.item()):.4f}  p50={timing['p50_ms']:.3f} ms")
     print("No forensic accuracy or INT8 speedup is claimed by this diagnostic.")
 
 

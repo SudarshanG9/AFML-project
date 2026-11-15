@@ -16,7 +16,14 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from avfuse.shared.contracts import PrecisionMode
+from avfuse.shared.contracts import (
+    PrecisionMode,
+    PRECISION_MODES,
+)
+
+from .dimodif_intervention import (
+    intervene_dimodif_attention,
+)
 from .model_adapter import ModelAdapter
 
 
@@ -305,6 +312,64 @@ class DiMoDifAdapter(ModelAdapter):
             "valid_length": valid_length,
         }
 
+    @torch.inference_mode()
+    def forward_with_mode(
+        self,
+        features: Mapping[str, Tensor],
+        mode: PrecisionMode,
+        trace: list[dict] | None = None,
+    ) -> dict[str, Tensor]:
+        """Run frozen DiMoDif with an attention intervention."""
+
+        if mode not in PRECISION_MODES:
+            raise ValueError(
+                f"Unsupported precision mode: {mode}"
+            )
+
+        video, audio, valid_length = (
+            self.prepare_features(features)
+        )
+
+        # All five existing MHA modules are temporarily
+        # instrumented with the selected precision mode.
+        with intervene_dimodif_attention(
+            self.model,
+            mode=mode,
+            trace=trace,
+        ):
+            logits, hidden = self.model([
+                video,
+                audio,
+            ])
+
+        if not torch.isfinite(logits).all():
+            raise RuntimeError(
+                "Non-finite logits in precision run"
+            )
+
+        # Preserve the exact original DiMoDif scoring.
+        probabilities = torch.sigmoid(logits)
+
+        if self.config["feature_pyramid"]:
+            probabilities = probabilities.mean(dim=1)
+
+        fake_score = probabilities.amax(dim=-1)
+
+        if not torch.isfinite(fake_score).all():
+            raise RuntimeError(
+                "Non-finite fake probability"
+            )
+
+        return {
+            "logits": logits,
+            "hidden": hidden,
+            "modality_scores": probabilities,
+            "score_fake": fake_score,
+            "valid_length": valid_length,
+        }
+
+    
+    @torch.inference_mode()
     def predict_from_cached_features(
         self,
         features: Mapping[str, Tensor],
@@ -312,12 +377,27 @@ class DiMoDifAdapter(ModelAdapter):
     ) -> Tensor:
         """Return one fake probability per batch item."""
 
-        if mode != "reference":
-            raise NotImplementedError(
-                f"{mode} is not yet integrated into "
-                "the pretrained DiMoDif attention layers"
+        if mode not in PRECISION_MODES:
+            raise ValueError(
+                f"Unsupported precision mode: {mode}"
             )
 
-        return self.forward_reference(features)[
-            "score_fake"
-        ]
+        if mode == "reference":
+            # Keep original model as authoritative baseline.
+            result = self.forward_reference(features)
+
+        else:
+            result = self.forward_with_mode(
+                features,
+                mode=mode,
+            )
+
+        scores = result["score_fake"]
+
+        if scores.ndim != 1:
+            raise RuntimeError(
+                "Expected one fake score per batch item"
+            )
+
+        return scores
+
