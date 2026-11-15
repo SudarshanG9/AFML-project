@@ -1,9 +1,9 @@
 # Documentation authority and integrated application scope
 
-Frontend integration now exists on `integration/afml-frontend`: [application guide](../frontend/README.md) and [Phase 4 verification report](integration/PHASE_4_FRONTEND_REPORT.md). It adapts the latest frontend to the accepted backend. Final release approval and merging into `main` remain pending.
+The consolidated backend and Streamlit frontend are integrated on `main`. See the [application guide](../frontend/README.md), [Phase 5 report](integration/PHASE_5_RELEASE_READINESS_REPORT.md), and [successful main-branch CI](https://github.com/SudarshanG9/AFML-project/actions/runs/43721523552).
 
 
-Phases 1–3 (backend cleanup/consolidation) and Phase 4 (frontend integration) are completed. Phase 5 is the current final quality gate, recorded in the [release-readiness report](integration/PHASE_5_RELEASE_READINESS_REPORT.md). Merge into `main` remains pending project-lead authorization. Earlier phase reports retain their original scope and deferred-work statements as historical evidence.
+Phases 1–3 (backend cleanup/consolidation), Phase 4 (frontend integration), and Phase 5 (pre-merge quality gate) are complete. The project lead merged the integration into `main` at `139733bbb5e2dab06fcf382bae6716bef79b7427`. The [Phase 5 report](integration/PHASE_5_RELEASE_READINESS_REPORT.md) retains its original pre-merge decision and open demonstration checks as dated evidence; it is not a statement that the merge is still pending.
 
 ## Current project explanation
 
@@ -20,7 +20,7 @@ Start with the [root README](../README.md), then read the numbered research chap
 9. [Reproducibility and user guide](09_REPRODUCIBILITY_AND_USER_GUIDE.md)
 10. [Evidence and references](10_EVIDENCE_AND_REFERENCES.md)
 
-The current component guides explain [Member 1](../src/avfuse/member1_fusion/README.md), [Member 2](../src/avfuse/member2_data/README.md) and [Member 3](../src/avfuse/member3_runtime/README.md). [Saved result tables](results/README.md) retain original aggregate values and their source hashes. The [Phases 1–3 report](integration/PHASES_1_TO_3_REPORT.md) records backend consolidation; the [Phase 4 report](integration/PHASE_4_FRONTEND_REPORT.md) records frontend integration; the [Phase 5 report](integration/PHASE_5_RELEASE_READINESS_REPORT.md) is the current pre-merge authority.
+The current component guides explain [Member 1](../src/avfuse/member1_fusion/README.md), [Member 2](../src/avfuse/member2_data/README.md) and [Member 3](../src/avfuse/member3_runtime/README.md). [Saved result tables](results/README.md) retain original aggregate values and their source hashes. The [Phases 1–3 report](integration/PHASES_1_TO_3_REPORT.md) records backend consolidation; the [Phase 4 report](integration/PHASE_4_FRONTEND_REPORT.md) records frontend integration; the [Phase 5 report](integration/PHASE_5_RELEASE_READINESS_REPORT.md) records the completed pre-merge audit and remaining demonstration checks.
 
 ## Historical records and supersession
 

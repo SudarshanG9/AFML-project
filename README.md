@@ -1,13 +1,13 @@
 # AVFuse-CausalQ
 
-Frontend integration now exists on `integration/afml-frontend`: [application guide](frontend/README.md) and [Phase 4 verification report](docs/integration/PHASE_4_FRONTEND_REPORT.md). It adapts the latest frontend to the accepted backend. Final release approval and merging into `main` remain pending.
+The consolidated backend and eight-page Streamlit dashboard are integrated on `main`. Start with the [application guide](frontend/README.md); the [Phase 5 report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) records the completed integration audit and its remaining demonstration checks.
 
 
 **A controlled study of numerical precision inside a frozen audiovisual deepfake detector.**
 
 **Integration scope:** backend Phases 1–3 and frontend Phase 4 are complete. Member 1's frozen pretrained adapter/four modes, Member 2's whole-video evaluation and paired analysis, Member 3's cached-feature CLI/benchmarks/provenance, repository cleanup, research documentation, Streamlit dashboard and automated integration tests are integrated. Python 3.10 and 3.12 CI passed for Phase 4.
 
-**Final review:** Phase 5 is the current engineering gate; its [release-readiness report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) records current tests, browser checks, limitations and the decision for merge review. Any remaining browser checks, optional explicitly authorized real-validation demonstration and project-lead approval to merge into `main` must be distinguished from the completed accepted research. Earlier [Phases 1–3](docs/integration/PHASES_1_TO_3_REPORT.md) and [Phase 4](docs/integration/PHASE_4_FRONTEND_REPORT.md) reports are historical execution evidence.
+**Current status:** The project lead merged the verified integration into `main` at `139733bbb5e2dab06fcf382bae6716bef79b7427`; [main-branch CI](https://github.com/SudarshanG9/AFML-project/actions/runs/43721523552) passed on Python 3.10 and 3.12. The dashboard can be launched locally and displays accepted saved results. Browser interaction checks and any separately authorized real-model demonstration remain open; neither is needed to read the completed study. The [Phase 5 report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) and earlier [Phases 1–3](docs/integration/PHASES_1_TO_3_REPORT.md) and [Phase 4](docs/integration/PHASE_4_FRONTEND_REPORT.md) reports are dated execution evidence.
 
 Can reducing precision in audiovisual fusion change forensic decisions, and can retaining precision in the value/output path repair more damage than retaining query precision at comparable measured cost? AVFuse-CausalQ investigates that question using pretrained **DiMoDif**, whole **LAV-DF** videos, four frozen precision configurations, source-grouped statistics and CPU cached-feature benchmarks.
 
