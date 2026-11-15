@@ -246,6 +246,9 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
         else:
             selected_row = {}
             st.warning("No usable clip_id values are available for feature inspection.")
+        default_npz_root = "."
+        if path is not None and path.is_relative_to(root):
+            default_npz_root = str(path.parent.relative_to(root))
         feature_layout = st.selectbox(
             "Feature layout for inspection",
             ["shared_pt", "dimodif_npz"],
@@ -257,7 +260,7 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
         feature_path_error: str | None = None
         if feature_layout == "dimodif_npz":
             npz_feature_root = st.text_input(
-                "DiMoDif feature root", value=".", key="npz_feature_inspection_root",
+                "DiMoDif feature root", value=default_npz_root, key="npz_feature_inspection_root",
                 help="The loader looks under <root>/<split>/<clip_id>/features.npz. Use a path inside this repository for local inspection.",
             )
             try:
