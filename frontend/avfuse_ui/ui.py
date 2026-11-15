@@ -32,7 +32,7 @@ def inject_styles() -> None:
     .stApp { background: #0b1220; }
     [data-testid="stSidebar"] { background: #0e1828; border-right: 1px solid rgba(148,163,184,.14); }
     [data-testid="stHeader"] { background: rgba(11,18,32,.88); }
-    .block-container { max-width: 1440px; padding-top: 1.4rem; padding-bottom: 3rem; }
+    .block-container { max-width: 1440px; padding-top: 4rem; padding-bottom: 3rem; }
     .avf-brand { display:flex; align-items:center; gap:.65rem; font-size:1.05rem; font-weight:750; letter-spacing:-.02em; }
     .avf-mark { width:34px; height:34px; border-radius:11px; display:grid; place-items:center; background:linear-gradient(135deg,#2c80ff,#31b8a6); color:white; font-weight:800; }
     .avf-eyebrow { color:#7dd3fc; font-size:.72rem; letter-spacing:.13em; text-transform:uppercase; font-weight:700; }
@@ -143,8 +143,7 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
     if last:
         st.json(last)
     verified = st.session_state.get("verified_runs", {})
-    passed = sum(v.get("ok") is True for v in verified.values())
-    st.caption(f"Integrity-passed runs in this session: {passed}; discovered runs without a recorded passing check: {max(0, len(files['run_dirs']) - passed)}. Checks describe the time of verification.")
+    st.caption(f"Past integrity checks in this session: {len(verified)}. These are dated observations, not continuous verification; inspect a run to check for subsequent file changes.")
     git = git_info(root)
     st.markdown("<div class='avf-warn'><b>Research integrity:</b> this dashboard never invents metrics. Empty states mean the corresponding artifact is not present locally. Simulated INT8 is floating-point fake quantization, not an INT8 kernel.</div>", unsafe_allow_html=True)
     st.write("")
@@ -174,8 +173,8 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
         panel_title("Backend readiness", "Detected from the checked-in source tree, not from assumptions in the proposal.")
         rows = [
             ("Python package / shared contracts", (root / "pyproject.toml").is_file() and (root / "contracts/schemas").is_dir(), "Package and JSON schemas found"),
-            ("Four-mode adapter interface", status["four_mode_model_ready"], status["adapter_mode_status"]),
-            ("Cached-feature CLI interface", status["real_inference_ready"], status["cli_status"]),
+            ("Four-mode adapter interface", status["adapter_interface_available"], status["adapter_mode_status"]),
+            ("Cached-feature CLI interface", status["execution_interface_available"], status["cli_status"]),
             ("Local prediction outputs", prediction_count > 0, f"{prediction_count} files discovered"),
             ("Structured benchmark outputs", benchmark_count > 0, f"{benchmark_count} files discovered"),
         ]
@@ -189,7 +188,7 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
         dirty_display = "yes" if dirty is True else ("no" if dirty is False else "unknown")
         st.markdown(f"<div class='avf-card'><div class='avf-card-label'>Repository</div><div class='avf-card-value' style='font-size:1.12rem'>AFML-project</div><div class='avf-card-foot'>SudarshanG9/AFML-project</div><hr><div class='avf-card-label'>Branch / commit</div><div style='color:#e2e8f0;font-weight:650;margin-top:5px'>{git.get('branch') or 'not available'} · {git.get('commit') or 'not available'}</div><div class='avf-card-foot'>Working tree dirty: {dirty_display}</div></div>", unsafe_allow_html=True)
         st.write("")
-        st.info("The application reads local files under data/ and artifacts/. It does not transmit dataset clips or experiment files to a server.")
+        st.info("The application reads local files under data/ and artifacts/. Uploaded files are received by the Streamlit server; the app does not automatically publish them to GitHub or third-party services.")
     st.divider()
     panel_title("What the checked-in backend actually supports")
     c1, c2 = st.columns(2)
@@ -540,7 +539,7 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
     st.markdown("<div class='avf-warn'><b>Input boundary:</b> this runs the pretrained detector on cached encoder features, not raw video/audio. The intervention modes use floating-point fake quantization, not an INT8 integer kernel. The UI never opens the held-out test split.</div>", unsafe_allow_html=True)
     st.subheader("Run real cached-feature validation")
     st.caption("Server operator must authorize external roots with AVFUSE_ASSET_ROOTS before launch.")
-    if not status["real_inference_ready"]:
+    if not status["execution_interface_available"]:
         st.error("The required four-mode adapter or Member 3 CLI components were not detected in this checkout.")
     else:
         st.info("This form runs the checked-in CLI on the validation split only. It validates paths/configuration first, then writes a run folder with predictions and a cached-feature benchmark.")
@@ -557,7 +556,7 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
             run_id = st.text_input("Unique run ID (required)", value="")
             experiment_id = st.text_input("Optional experiment ID", value="")
             confirm_inputs = st.checkbox("I have verified that this machine has the external checkpoint and local feature files; run validation only.", value=False)
-            submitted = st.form_submit_button("Validate inputs and run validation experiment", disabled=not status["real_inference_ready"])
+            submitted = st.form_submit_button("Validate inputs and run validation experiment", disabled=not status["execution_interface_available"])
         if submitted:
             from pathlib import Path as LocalPath
             upstream = LocalPath(upstream_root).expanduser()
@@ -960,15 +959,15 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
     page_header("REPRODUCIBILITY / MEMBER 3", "Runs & system",
                 "Inspect environment diagnostics, saved configuration snapshots, hashes and artifact-integrity checks.")
     run_dirs = files.get("run_dirs", [])
-    finalized_runs = run_dirs
+    discovered_runs = run_dirs
     st.caption("Run counts are discovery counts. Validated runs: not counted until explicit integrity checks; all discovered runs remain unverified in this view.")
-    provenance_count = sum((path / "provenance.json").is_file() for path in finalized_runs)
-    hash_manifest_count = sum((path / "integrity" / "artifact_hashes.json").is_file() for path in finalized_runs)
+    provenance_count = sum((path / "provenance.json").is_file() for path in discovered_runs)
+    hash_manifest_count = sum((path / "integrity" / "artifact_hashes.json").is_file() for path in discovered_runs)
     status_cols = st.columns(5)
     for col, label, value in zip(
         status_cols,
         ("Environment reports", "Discovered run directories", "Provenance files", "Artifact hash manifests", "Stage profiles"),
-        (len(files.get("environment_reports", [])), len(finalized_runs), provenance_count,
+        (len(files.get("environment_reports", [])), len(discovered_runs), provenance_count,
          hash_manifest_count, len(files.get("stage_profiles", []))),
     ):
         col.metric(label, value)
@@ -983,7 +982,7 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
             try: st.json(load_json(report_path))
             except Exception as exc: st.error(f"Could not read environment report: {exc}")
         else:
-            st.caption("No environment_report.json found in artifacts/runs.")
+            st.caption("No environment report selected; choose a discovered report above.")
         if st.button("Run local environment check", use_container_width=True):
             with st.spinner("Checking Python, OS, CPU/RAM, PyTorch, available devices and tiny dtype/SDPA operations..."):
                 code, output, out_path = run_environment_check(root)
@@ -994,63 +993,68 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
                     except Exception as exc: st.error(f"Environment report was written but could not be parsed: {exc}")
             else:
                 st.error(output or f"Environment check exited with code {code}.")
+            from .data_access import discover_files
+            files.update(discover_files(root))
             if output:
                 with st.expander("Command output"):
                     st.code(output)
     with col2:
         st.subheader("Run integrity")
-        chosen = st.selectbox("Run folder", ["— none —", *[str(p.relative_to(root)) for p in finalized_runs]], key="run_select")
-        run_dir = next((p for p in finalized_runs if str(p.relative_to(root)) == chosen), None)
+        chosen = st.selectbox("Run folder", ["— none —", *[str(p.relative_to(root)) for p in discovered_runs]], key="run_select")
+        run_dir = next((p for p in discovered_runs if str(p.relative_to(root)) == chosen), None)
         if run_dir:
-            manifest_path = run_dir / "run_manifest.json"
-            if manifest_path.is_file():
-                try:
-                    run_manifest = load_json(manifest_path)
-                except Exception as exc:
-                    st.error(f"Could not parse run manifest: {exc}")
-                    run_manifest = {}
-                for summary_name in ("execution_summary.json", "failure_summary.json"):
-                    if (run_dir / summary_name).is_file():
-                        st.json(load_json(run_dir / summary_name))
-                st.caption("Integrity hashes detect changes; they do not authenticate authorship. Failed or partial execution remains incomplete even if hashes pass.")
-                st.write(f"**Run ID:** {run_manifest.get('run_id', run_dir.name)}")
-                st.write(f"**Artifacts listed:** {len(run_manifest.get('artifacts', []))}")
-                try:
-                    import sys
-                    src = str(root / "src")
-                    if src not in sys.path: sys.path.insert(0, src)
-                    from avfuse.member3_runtime.artifacts import verify_run_integrity
-                    if not st.button("Verify selected run integrity", key="verify_run"):
-                        st.info("Integrity not checked. Manifest presence alone does not prove finalization or integrity.")
-                        st.json(run_manifest)
-                        return
-                    verdict = verify_run_integrity(run_dir)
-                    st.session_state.setdefault("verified_runs", {})[str(run_dir)] = verdict
-                    if verdict.get("ok"):
-                        st.success("Run artifact integrity check passed.")
-                    else:
-                        st.error("Run artifact integrity check found issues.")
-                    st.json(verdict)
-                except Exception as exc:
-                    st.warning(f"Could not execute the backend integrity verifier: {type(exc).__name__}: {exc}")
-                with st.expander("Run manifest"):
-                    st.json(run_manifest)
-                for filename, title in (("resolved_config.json", "Resolved experiment configuration"),
-                                        ("provenance.json", "Run provenance and hashes")):
-                    artifact_path = run_dir / filename
-                    if artifact_path.is_file():
-                        with st.expander(title):
-                            st.json(load_json(artifact_path))
+            from .run_inspection import (optional_metadata, manifest_structure_valid,
+                                         verify_with_receipt, receipt_is_current)
+            metadata = {}
+            for filename in ("run_manifest.json", "execution_summary.json", "failure_summary.json",
+                             "resolved_config.json", "provenance.json"):
+                value, error = optional_metadata(run_dir / filename)
+                metadata[filename] = value
+                if error:
+                    st.error(error)
+                if value is not None:
+                    with st.expander(filename, expanded=filename.endswith("summary.json")):
+                        st.json(value)
+            manifest = metadata["run_manifest.json"]
+            valid_structure = manifest_structure_valid(manifest)
+            if manifest is None:
+                st.warning("No readable run manifest: discovered run is incomplete or invalid.")
+            elif not valid_structure:
+                st.error("Invalid run_manifest.json structure; finalization is not established.")
             else:
-                st.warning("Selected folder has no run_manifest.json; it is not a finalized Member 3 run bundle.")
-                for filename in ("failure_summary.json", "execution_summary.json"):
-                    if (run_dir / filename).is_file():
-                        try:
-                            st.json(load_json(run_dir / filename))
-                        except (OSError, ValueError) as exc:
-                            st.error(str(exc))
+                st.write(f"**Run ID:** {manifest['run_id']}")
+                st.write(f"**Artifacts listed:** {len(manifest['artifacts'])}")
+                st.caption("Finalization metadata present; integrity is not established by its presence.")
+            summary = metadata["execution_summary.json"]
+            failure = metadata["failure_summary.json"]
+            if failure is not None:
+                st.warning("Failure summary present. This run is not established as a completed experiment.")
+            elif summary is not None:
+                st.write(f"Recorded execution status: {summary.get('status', 'not stated')}")
+            else:
+                st.caption("Execution completion not established: no readable execution summary.")
+            st.caption("Hash consistency does not authenticate authorship or establish scientific evaluation success.")
+            if st.button("Verify selected run integrity", key="verify_run"):
+                try:
+                    receipt = verify_with_receipt(run_dir)
+                    st.session_state.setdefault("verified_runs", {})[str(run_dir)] = receipt
+                except Exception as exc:
+                    st.session_state.setdefault("verified_runs", {}).pop(str(run_dir), None)
+                    st.error(f"Integrity verification failed for {run_dir.name}: {type(exc).__name__}: {exc}")
+            receipt = st.session_state.get("verified_runs", {}).get(str(run_dir))
+            if receipt is None:
+                st.info("Not verified: use the explicit integrity button when needed.")
+            else:
+                st.caption(f"Past check: {receipt['checked_at_utc']}. Not a continuous guarantee.")
+                if not receipt_is_current(run_dir, receipt):
+                    st.warning("Not verified for current files: metadata changed since or during the past check. Verify again.")
+                elif receipt["verdict"].get("ok"):
+                    st.success("Artifact integrity passed at the recorded check time; scientific validity is separate.")
+                else:
+                    st.error("Artifact integrity failed at the recorded check time.")
+                st.json(receipt["verdict"])
         else:
-            st.caption("No run directories found under artifacts/runs/ or artifacts/member3/runs/.")
+            st.caption("No run selected. Select a discovered run to inspect metadata without automatically hashing it.")
     st.divider()
     panel_title("Run bundle contents", "Expected files created by Member 3's RunContext when a run is finalized.")
     st.code("""artifacts/runs/<run_id>/
@@ -1084,13 +1088,16 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
         if isinstance(stages, list) and stages:
             stage_rows = []
             for stage in stages:
+                if not isinstance(stage, dict):
+                    st.error("Invalid stage_profile.json entry: expected an object.")
+                    continue
                 row = {k: stage.get(k) for k in ("stage", "scope_group", "stage_kind", "status", "input_kind", "p50_ms", "p95_ms", "measurement_origin") if k in stage}
                 if row: stage_rows.append(row)
             if stage_rows:
                 st.dataframe(pd.DataFrame(stage_rows), use_container_width=True, hide_index=True)
         st.json(profile)
     else:
-        st.caption("No finalized run stage_profile.json was discovered. The profiler's in-memory output does not automatically become a report unless a caller writes it through RunContext.")
+        st.caption("No stage profile selected. Choose a discovered artifact above; missing stages are not measurements.")
 
 
 def render_import_help(root: Path) -> None:
@@ -1122,4 +1129,4 @@ artifacts/reports/<split>/metrics.json
 artifacts/runs/<run_id>/*""", language="text")
     st.subheader("Files deliberately not accepted as experiment inputs")
     st.markdown("- Raw video/audio files: no upload-to-inference route exists in the checked-in backend.\n- Arbitrary PyTorch checkpoints: the dashboard does not load or execute user-supplied model weights.\n- Test labels or labels embedded in prediction rows: prediction contract explicitly excludes ground truth.\n- Synthetic smoke scores: never treated as accuracy, AUROC, or research evidence.\n- Uploaded `.pt` / `.npz` feature files: metadata inspection only; no inference, conversion or persistent copy is performed.")
-    st.info(f"Repository root detected: `{root}`. Set `AVFUSE_REPO_ROOT` before launch or edit the root in the sidebar if the code is stored elsewhere.")
+    st.info(f"Repository root detected: `{root}`. Set `AVFUSE_REPO_ROOT` before launch if the code is stored elsewhere; the sidebar does not edit server paths.")

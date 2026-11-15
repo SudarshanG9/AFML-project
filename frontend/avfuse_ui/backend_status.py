@@ -40,7 +40,7 @@ def git_info(root: Path) -> dict[str, Any]:
 
 
 def inspect_backend(root: Path) -> dict[str, Any]:
-    """Source inspection only; does not verify a checkpoint or run inference."""
+    """Source/import/parser checks only; never construct a model or verify assets."""
     import importlib
     required = ("member1_fusion.dimodif_adapter", "member1_fusion.dimodif_intervention",
                 "member2_data.cache", "member3_runtime.cli", "member3_runtime.artifacts",
@@ -53,13 +53,14 @@ def inspect_backend(root: Path) -> dict[str, Any]:
             modules = [importlib.import_module("avfuse." + name) for name in required]
             if not all(Path(module.__file__).resolve().is_relative_to((root / "src").resolve()) for module in modules):
                 raise ImportError("Installed package does not match selected repository")
-            adapter, _, _, cli, _, _, contracts = modules
+            adapter, _, _, cli, _, _, _ = modules
             imported = callable(adapter.DiMoDifAdapter.forward_with_mode)
             parser = cli.build_parser()
             for name in REQUIRED_COMMANDS:
                 parser.parse_args([name, *({"predict": ["--output", "unused.jsonl"], "inspect": ["unused"]}.get(name, []))])
             detail = "Actual adapter imports and CLI parser checked; no model loaded"
         except (ImportError, AttributeError, SystemExit) as exc:
+            imported = False
             detail = f"Software interface check failed: {exc}"
     return {
         "source_available": source_available, "interfaces_imported": imported,
@@ -70,9 +71,9 @@ def inspect_backend(root: Path) -> dict[str, Any]:
         "artifact_integrity_verified": "Not checked; explicit verification required",
         "repository_readme": (root / "README.md").is_file(),
         "model_adapter_file": source_available, "intervention_file": source_available,
-        "adapter_mode_status": detail, "four_mode_model_ready": imported,
-        "cli_status": detail, "real_cli_ready": imported,
-        "real_inference_ready": imported,
+        "adapter_mode_status": detail, "adapter_interface_available": imported,
+        "cli_status": detail, "cli_interface_available": imported,
+        "execution_interface_available": imported,
         "notes": ["Source and software checks do not verify external assets, complete a run, or establish research validity."]}
 
 
