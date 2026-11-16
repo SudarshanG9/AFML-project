@@ -1,59 +1,64 @@
-# AVFuse-CausalQ local research dashboard
+# DeepTrace — Precision Experimentation Workbench
 
-This eight-page Streamlit application adapts to the consolidated backend. It displays the completed accepted study and supports explicitly confirmed **validation-only** cached-feature development runs. It does not reproduce the study on launch or imply final release approval.
+DeepTrace is the local Streamlit interface for the existing AVFuse-CausalQ research pipeline. Its three sections are **Experiment**, **Results** and **About**. It supports reading accepted historical evidence and explicitly authorized **validation-only** cached-feature inference. Reading saved results never starts a model or evaluator.
+
+## Launch
+
+From the repository root, using Python 3.10+:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 python -m pip install -r frontend/requirements.txt
-# Optional: server-operator-authorized external directories, separated by the OS path separator.
+# Optional: directories explicitly trusted by the server operator.
 export AVFUSE_ASSET_ROOTS='/absolute/DiMoDif:/absolute/validation-assets'
 cd frontend
 PYTHONPATH=../src:. python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
-Launch from `frontend/` to apply its Streamlit configuration (loopback and 32 MiB uploads). The server operator chooses the repository through `AVFUSE_REPO_ROOT`; the browser cannot change it. The application is for a trusted local machine, not a public inference API. If exposed remotely, uploads are processed by the server, not exclusively on the visitor's device. External roots authorize read access and trusted upstream model code; configure only directories you trust.
+Launch from `frontend/` to load its light theme, loopback binding and 32 MiB upload cap. Set `AVFUSE_REPO_ROOT` before launch if the intended checkout differs. External roots authorize read access and trusted upstream Python code; configure only directories you trust. The browser cannot change the repository or authorized roots. For restricted macOS filesystem-watcher environments add `--server.fileWatcherType none`.
 
-## Pages
+## Workflow
 
-| Page | Purpose |
-|---|---|
-| Overview | Source/interface checks, repository status, artifact availability and scientific status |
-| Dataset & features | Manifest schema, source/identity overlap, distributions and bounded validation-cache metadata inspection |
-| Fusion diagnostics | Existing ablation, five-layer attention, mask and theoretical dense-memory reports; explicit missing states |
-| Demo & predictions | Confirmed validation CLI execution; predictions isolated by run/split/checkpoint |
-| Evaluation | Source-bound committed tables or a separately selected structured metrics JSON |
-| Benchmarks | Saved CPU evidence or imported records checked by the backend; measurement identities kept separate |
-| Runs & system | Discovered, incomplete and finalized bundles; explicit integrity verification and environment checks |
-| Artifact import | Accepted formats, provenance boundaries and upload limitations |
+1. **Open Experiment.** The default source is **Explore accepted research results**. Choose the four existing precision modes and open the saved study. Results identify historical source/split/cohort, original metrics and recorded CPU workloads. Missing clip-level scores remain unavailable.
+2. **Choose Run new validation experiment.** Open Execution settings. Select an actual discovered, schema-valid LAV-DF validation manifest when available, or enter an operator-authorized path. Configure external DiMoDif checkout, feature root/format, explicit device, unique run ID and optional experiment ID. All four modes default selected.
+3. **Check Readiness.** The frontend checks every required cache path, expected/found/missing counts, manifest/schema/groups, model source/configuration, checkpoint SHA-256, device availability and one bounded real-loader cache. Failures name missing assets and do not launch the experiment CLI or consume a run ID. Success also requires the existing Member 3 `validate-config`; this is a software/assets check, not model inference.
+4. **Optionally test one real validation sample.** Select the forward-check option and authorize the trusted assets. Readiness calls the existing `predict --max-clips 1` CLI with temporary output. It discards scores and reports sample compatibility only. This does not guarantee the full cohort will succeed.
+5. **Run Experiment.** Explicit authorization and current readiness enable execution. Asset/configuration changes invalidate readiness; material input changes reset authorization. Draft settings and authorization survive navigation. Execution rechecks assets, then calls Member 3 `run --split val --require-lavdf-hash` with explicit modes/device. No fallback, raw media route, overwrite or test access is offered. Existing run directories remain protected.
+6. **Open generated results.** Predictions and benchmarks are rediscovered and isolated by the selected run/split/checkpoint. Failed, incomplete and malformed runs remain inspectable. Inference completion leaves **label-grounded evaluation not performed** unless an associated evaluator report actually exists.
+7. **Optionally evaluate validation labels.** Supply an existing frozen protocol matching the exact unchanged validation-only manifest/checkpoint and original validation-fixed threshold. The frontend invokes Member 2's evaluator with 1000 source-cluster bootstrap replicates and seed 0, without calibration or test flags. A protocol bound to the historical canonical manifest will be refused for a different validation-only subset. The app never rewrites that protocol to make it fit. If no compatible protocol/labels exist, performance metrics stay unavailable.
+8. **Inspect evidence.** Results show available performance, manipulation recall, one-clip score differences and measured computational cost. Technical details expose provenance, failure records, original diagnostics, dated explicit integrity checks and downloads of actual files. An integrity receipt checks file consistency, not authorship or scientific validity.
 
-## Execution and assets
+## Required assets and four configurations
 
-`ui.py` handles presentation, `backend_status.py` adapts Member 1 interfaces and invokes Member 3 using subprocess argument lists, and `data_access.py` parses and validates artifacts using Member 2 schemas and Member 3 loaders/verifiers. No second detector exists.
+New inference requires the trusted external DiMoDif `src/models.py`, supported LAV-DF `.pth` and adjacent `.json` configuration, a labeled schema-valid validation-only manifest and its compatible features. The expected frozen weight SHA-256 is enforced, never editable in the UI. See the [backend reproduction guide](../docs/09_REPRODUCIBILITY_AND_USER_GUIDE.md) for asset identities and source revision.
 
-Supply a trusted external DiMoDif checkout with the supported LAV-DF checkpoint and adjacent model configuration, a schema-valid **validation-only** manifest, and a feature root. The wrapper always requests `--split val`, `--require-lavdf-hash`, explicit device/modes and JSON output. It runs `validate-config` first. The backend retains final checkpoint, device and execution authorization checks. No automatic CPU fallback is performed. The form requires confirmation and a unique run ID; resubmitting an ID in the same session is blocked, and existing run directories are refused.
+- `reference`: FP32 reference using the original model forward.
+- `low_precision`: simulated INT8 at Q/K/V and attention output.
+- `restore_value_output`: preserve V and attention output at FP32.
+- `restore_query`: preserve Q at FP32 as the control.
 
-- `dimodif_npz`: `<feature_root>/val/<clip_id>/features.npz`, with floating finite rank-two `video_features` and `audio_features`, width 768.
-- `shared_pt`: manifest `feature_path` resolved within the feature root; safely loaded `video_tokens` and `audio_tokens`, supported rank two/three, width 768 and matching batch dimensions.
+`dimodif_npz` uses `<feature_root>/val/<clip_id>/features.npz`, with finite floating rank-two `video_features` and `audio_features`, width 768. The manifest's historical planned PT path is ignored in this format. `shared_pt` resolves manifest `feature_path` within the selected root and delegates to the existing safe weights-only loader for `video_tokens`/`audio_tokens`. Escaping cache symlinks are rejected. Readiness loads at most one cache, capped at 32 MiB compressed/expanded; larger representative caches are refused with an inspection-limit explanation. Full tensor compatibility across every clip is established only during actual execution.
 
-Metadata inspection is capped at 32 MiB compressed and expanded; valid larger caches can still be inputs to authorized backend inference. Uploaded caches are temporarily inspected with the real loaders and are not inference authorization. No arbitrary checkpoint or raw-video upload is accepted. Test cache inspection is disabled. Missing assets remain unavailable; synthetic smoke is separately labeled software diagnostics, never detector evidence.
+## Evidence and scientific limits
 
-## Research and artifacts
+Saved CSVs under `docs/results/` retain original artifact `source_sha256` fields. They are aggregate extracts, not new evaluation. Imported evaluation and benchmark artifacts are presented independently and are never automatically attached to a run. New evaluation reports live outside finalized inference bundles, under `artifacts/member3/evaluations/<run>/<unique-id>/`; receipts bind their predictions, manifest, checkpoint, protocol and report hashes. Reports without a matching receipt are not shown as new-run evaluation.
 
-Saved tables under [`docs/results`](../docs/results/) preserve original `source_sha256` values. They are aggregate presentations, not a new evaluation. Imported `metrics.json` is selected separately and never overwritten by those tables. Prediction rows do not identify a dataset: establish dataset identity from run provenance before scientific comparison. A missing mode remains missing.
+The model uses audited joint-sequence AV self-attention. Simulated INT8 executes floating-point fake quantization, not integer kernels. Saved CPU timing is resident `cached_feature_model` timing, excluding raw-video preprocessing; operator and preprocessing measurements stay separate. CPU peak memory is unmeasured, not zero; theoretical dense-attention storage is not a hardware measurement. Missing external timing samples prevent benchmark verification.
 
-Saved CPU timings are `cached_feature_model`, not raw-video end-to-end timing. Operator and preprocessing scopes remain distinct; stage medians are not summed. CPU peak memory is unmeasured, not zero. Fake INT8 is floating-point simulation, not native integer execution. Overall precision damage and V/output superiority were not statistically established; intervals crossing zero are not equivalence. See the [research index](../docs/README.md) for authoritative limitations and evidence.
+The accepted study does not establish significant overall precision degradation or V/output restoration superiority. Nonsignificance does not prove equality. Source grouping does not establish speaker independence; validation checkpoint-selection bias and historical test-summary exposure remain disclosed. The interface offers no universal detector or deployment claim and never unseals the held-out test set.
 
-Discovered run directories are not automatically valid. Inspect execution/failure summaries and trigger the backend integrity verifier explicitly. Hash consistency does not authenticate authorship. Imported benchmark records with missing external timing samples remain incompletely verified.
+This app is intended for a trusted local machine. Uploaded artifacts reach the Streamlit server; they are session inputs, not automatically committed or published. Raw media and arbitrary checkpoint uploads are not supported. Download controls export actual available evidence only.
+
+## Verification
 
 ```bash
-# From repository root
+# From repository root, in the installed environment
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:frontend python -m pytest -q tests frontend/tests
-python -m avfuse.member3_runtime.cli --help
-python -m avfuse.member3_runtime.cli --smoke
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:frontend python -m ruff check --select F frontend
+PYTHONPATH=src python -m avfuse.member3_runtime.cli --help
+PYTHONPATH=src python -m avfuse.member3_runtime.cli --smoke
 ```
 
-See [INTEGRATION.md](INTEGRATION.md) and the [Phase 5 release-readiness report](../docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) for current verification evidence and remaining limitations. The [Phase 4 report](../docs/integration/PHASE_4_FRONTEND_REPORT.md) is preserved as historical integration evidence.
-
-Run verification is explicit. A dated past integrity check is not a continuous guarantee; file-metadata changes invalidate its current status. Missing or malformed optional run metadata is reported by filename while other sections remain usable.
+The last command uses synthetic diagnostic tokens; its output is never detector evidence. Tests use temporary synthetic fixtures and mocked subprocesses, plus one actual Member 2 fixture evaluation. They do not require licensed assets. Detailed phase history, exact local commands, test counts, browser checks and remaining limitations are recorded in [INTEGRATION.md](INTEGRATION.md).

@@ -111,3 +111,48 @@ def test_authorization_persists_navigation_and_resets_with_assets():
     assert app.checkbox(key='draft_authorized').value
     app.text_input(key='draft_manifest').set_value('changed.jsonl').run()
     assert not app.checkbox(key='draft_authorized').value
+
+
+def test_result_source_survives_navigation():
+    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
+    app.sidebar.radio[0].set_value('Results').run()
+    app.radio(key='result_source').set_value('Imported artifacts').run()
+    app.sidebar.radio[0].set_value('About').run()
+    app.sidebar.radio[0].set_value('Results').run()
+    assert app.radio(key='result_source').value == 'Imported artifacts'
+    assert not app.exception
+
+
+def test_about_includes_joint_attention_and_negative_findings():
+    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
+    app.sidebar.radio[0].set_value('About').run()
+    content=' '.join(e.value for kind in (app.markdown, app.caption, app.warning) for e in kind)
+    assert 'joint-sequence' in content
+    assert 'not statistically established' in content
+    assert 'not integer-kernel deployment' in content
+    assert 'validation-only' in content
+
+
+def test_verified_readiness_and_authorization_enable_execution(monkeypatch):
+    from avfuse_ui import workbench_service
+    from avfuse_ui.backend_status import RunResult
+    calls=[]
+    monkeypatch.setattr(workbench_service, 'validate_experiment_readiness', lambda *a,**k: RunResult(0,'Assets checked',dict(status='ready',phase='readiness')))
+    monkeypatch.setattr(workbench_service, 'readiness_is_current', lambda result: True)
+    def execute(*args, **kwargs):
+        calls.append(kwargs)
+        return RunResult(4, 'Fixture incomplete run', dict(phase='execution', status='incomplete', cli_launched=True))
+    monkeypatch.setattr(workbench_service,'execute_validation_experiment',execute)
+    app=AppTest.from_file(str(ROOT/'frontend/app.py'), default_timeout=30).run()
+    app.radio(key='draft_source').set_value('Run new validation experiment').run()
+    app.text_input(key='draft_run_id').set_value('fixture-run').run()
+    app.checkbox(key='draft_authorized').check().run()
+    next(b for b in app.button if b.label=='Check Readiness').click().run()
+    assert not next(b for b in app.button if b.label=='Run Experiment').disabled
+    assert any('<b>2. Run Experiment</b>' in e.value for e in app.markdown)
+    next(b for b in app.button if b.label=='Run Experiment').click().run()
+    assert not app.exception and len(calls)==1
+    assert calls[0]['modes']==list(__import__('avfuse_ui.data_access',fromlist=['CONFIGS']).CONFIGS)
+    assert any('incomplete' in e.value for e in app.warning)
+    assert not any('Inference completed' in e.value for e in app.success)
+    assert next(b for b in app.button if b.label=='Run Experiment').disabled

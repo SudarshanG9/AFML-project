@@ -131,3 +131,10 @@ def test_backend_run_timeout_keeps_phase(inputs, monkeypatch):
     out = backend_status.run_cached_feature_experiment(ROOT, **inputs)
     assert out.code == 124 and out.payload['phase'] == 'execution'
     assert out.payload['status'] == 'timeout'
+
+
+def test_registry_contains_only_real_valid_validation_manifests(inputs, tmp_path):
+    valid=Path(inputs['manifest'])
+    bad=tmp_path/'bad.jsonl'; bad.write_text('bad')
+    heldout=tmp_path/'heldout.jsonl'; heldout.write_text(valid.read_text().replace('"val"','"test"'))
+    assert service.available_validation_manifests(ROOT,[valid,bad,heldout,tmp_path/'missing'])==[valid]
