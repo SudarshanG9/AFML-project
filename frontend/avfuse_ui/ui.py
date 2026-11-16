@@ -572,13 +572,14 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
             elif not confirm_inputs:
                 st.warning("Confirm the local checkpoint and feature inputs before starting the run.")
             else:
-                st.session_state.setdefault("submitted_runs", set()).add(run_id)
                 with st.spinner("Validating configuration and running the selected validation modes..."):
                     outcome = run_cached_feature_experiment(
                         root, upstream_root=str(upstream.resolve()), checkpoint_name=checkpoint_name,
                         manifest=str(manifest.resolve()), feature_root=str(features.resolve()),
                         feature_format=feature_format, device=device, modes=modes,
                         run_id=run_id, experiment_id=experiment_id, require_lavdf_hash=require_hash)
+                if outcome.payload.get("phase") == "execution" and outcome.payload.get("cli_launched"):
+                    st.session_state.setdefault("submitted_runs", set()).add(run_id)
                 st.session_state["last_run_result"] = {"exit_code": outcome.code, **outcome.payload}
                 code, output = outcome
                 if outcome.payload:
@@ -589,7 +590,10 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
                 if code == 0:
                     st.success("Backend CLI exited successfully. Evaluate predictions with Member 2 before making research claims.")
                 else:
-                    st.error(f"Backend CLI exited with code {code}. Review the diagnostic output; the run may be blocked or incomplete.")
+                    if outcome.payload.get("phase") == "preflight":
+                        st.error("Readiness check failed. No experiment CLI was launched.")
+                    else:
+                        st.error(f"Backend {outcome.payload.get('phase', 'command')} failed with code {code}.")
                 st.code(output or "No output", language="text")
                 st.caption("A successful command is not research release approval.")
     st.divider()
@@ -1186,9 +1190,57 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
                 _draft_widget("text_input", "Run ID", "run_id", "")
                 _draft_widget("text_input", "Experiment ID (optional)", "experiment_id", "")
                 st.caption("The frozen LAV-DF checkpoint SHA-256 is required and enforced by the backend.")
-            st.button("Check Readiness", disabled=True)
-            st.button("Run Experiment", disabled=True, type="primary")
-            st.caption("Configure assets before execution. Readiness is not established.")
+            from .workbench_service import validate_experiment_readiness, execute_validation_experiment, readiness_is_current
+            draft = st.session_state["experiment_draft"]
+            request = {k: draft.get(k, "") for k in ("upstream_root", "manifest", "feature_root", "feature_format", "device", "run_id", "experiment_id")}
+            request.update(checkpoint_name="lavdf", require_lavdf_hash=True, modes=modes)
+            if st.session_state.get("authorization_request") != request:
+                st.session_state["authorization_request"] = request
+                st.session_state.pop("readiness", None)
+                st.session_state["draft_authorized"] = False
+                draft["authorized"] = False
+            authorized = _draft_widget("checkbox", "I authorize validation inference with these trusted local assets.", "authorized", False)
+            smoke = _draft_widget("checkbox", "Test one real validation sample during readiness", "smoke", False,
+                help="Loads the licensed model through the existing CLI. Temporary scores are discarded; this is not a completed experiment.")
+            if st.button("Check Readiness", disabled=bool(smoke and not authorized)):
+                with st.spinner("Checking assets and software configuration…"):
+                    st.session_state["readiness"] = validate_experiment_readiness(root, smoke=smoke, **request)
+            readiness = st.session_state.get("readiness")
+            ready = bool(readiness and readiness.code == 0 and readiness_is_current(readiness))
+            if readiness:
+                if readiness.code:
+                    st.error(readiness.diagnostics)
+                elif not ready:
+                    st.warning("Assets changed since readiness. Check again before execution.")
+                else:
+                    st.success(readiness.diagnostics)
+                with st.expander("Asset readiness details"):
+                    st.json({k: readiness.payload.get(k) for k in ("phase", "status", "cli_launched", "asset_counts", "missing_assets", "sample_inspected", "smoke_passed")})
+            else:
+                st.caption("Not configured · Check Readiness identifies missing assets before any experiment starts.")
+            if st.button("Run Experiment", disabled=not (ready and authorized), type="primary"):
+                with st.spinner("Executing the validation cohort and cached-feature benchmark…"):
+                    outcome = execute_validation_experiment(root, **request)
+                st.session_state["last_run_result"] = {"exit_code": outcome.code, **outcome.payload}
+                st.session_state["run_diagnostics"] = outcome.diagnostics
+                st.session_state.pop("readiness", None)
+                if outcome.payload.get("run_dir"):
+                    st.session_state["selected_run"] = outcome.payload["run_dir"]
+                    st.session_state["result_source"] = "New validation run"
+                files.update(__import__("avfuse_ui.data_access", fromlist=["discover_files"]).discover_files(root))
+                st.rerun()
+            last = st.session_state.get("last_run_result")
+            if last:
+                if last.get("status") == "complete" and last.get("exit_code") == 0:
+                    st.success("Inference completed. Label-grounded evaluation has not been performed.")
+                elif last.get("phase") == "preflight":
+                    st.error("Readiness check failed. No experiment CLI was launched.")
+                else:
+                    st.warning(f"Execution status: {last.get('status', 'unknown')} · exit {last.get('exit_code')}. Inspect the available run artifacts.")
+                with st.expander("Execution details"):
+                    st.json(last)
+                    st.code(st.session_state.get("run_diagnostics", ""), language="text")
+                st.button("Open generated results", on_click=_open_results)
     with right, st.container(border=True):
         st.subheader("Results preview")
         st.write("One performance table, one manipulation chart and one cost comparison.")
