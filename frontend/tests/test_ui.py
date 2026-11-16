@@ -87,3 +87,27 @@ def test_malformed_metrics_object_has_useful_error(tmp_path, monkeypatch):
     assert not app.exception
     assert app.error
     assert not app.success
+
+
+def test_readiness_failure_has_no_cli_attribution_or_id_reservation():
+    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
+    app.radio(key='draft_source').set_value('Run new validation experiment').run()
+    app.text_input(key='draft_run_id').set_value('reusable-id').run()
+    next(b for b in app.button if b.label == 'Check Readiness').click().run()
+    assert not app.exception
+    assert any('No experiment CLI was launched' in e.value for e in app.error)
+    assert next(b for b in app.button if b.label == 'Run Experiment').disabled
+    assert 'submitted_runs' not in app.session_state
+    next(b for b in app.button if b.label == 'Check Readiness').click().run()
+    assert app.text_input(key='draft_run_id').value == 'reusable-id'
+
+
+def test_authorization_persists_navigation_and_resets_with_assets():
+    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
+    app.radio(key='draft_source').set_value('Run new validation experiment').run()
+    app.checkbox(key='draft_authorized').check().run()
+    app.sidebar.radio[0].set_value('About').run()
+    app.sidebar.radio[0].set_value('Experiment').run()
+    assert app.checkbox(key='draft_authorized').value
+    app.text_input(key='draft_manifest').set_value('changed.jsonl').run()
+    assert not app.checkbox(key='draft_authorized').value
