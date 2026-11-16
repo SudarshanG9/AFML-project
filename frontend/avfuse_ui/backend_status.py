@@ -116,7 +116,7 @@ def _invoke_cached_feature_experiment(
     feature_root: str, feature_format: str, device: str, modes: Sequence[str],
     run_id: str = "", experiment_id: str = "", require_lavdf_hash: bool = True,
     timeout_seconds: int = 86400, validate_only: bool = False,
-) -> tuple[int, str]:
+) -> RunResult:
     """Validate then run real cached-feature inference on validation only."""
     from dataclasses import asdict
     from .workbench_service import inspect_experiment_assets
@@ -172,7 +172,14 @@ def _invoke_cached_feature_experiment(
             result = json.loads(executed.stdout)
             if not isinstance(result, dict) or result.get("status") != "complete" or result.get("finalized") is not True:
                 raise ValueError("Successful exit lacks completed and finalized status")
-        except ValueError as exc:
+            from avfuse.member2_data.readiness import DIMODIF_LAVDF_SHA256
+            if (result.get("run_id") != run_id or result.get("split") != "val"
+                    or result.get("checkpoint_sha256") != DIMODIF_LAVDF_SHA256
+                    or result.get("dataset_complete") is not True
+                    or set(result.get("requested_modes", [])) != set(modes)):
+                raise ValueError("Successful response does not match the requested validation experiment")
+
+        except (ValueError, TypeError) as exc:
             return RunResult(1, f"Malformed backend run JSON: {exc}", {**details, "phase": "execution", "cli_launched": True, "status": "invalid_response", "run_dir": str(root / "artifacts/member3/runs" / run_id)})
     run_output = f"Status: {EXIT_NAMES.get(executed.returncode, 'UNKNOWN')}\nRun directory: {root / 'artifacts/member3/runs' / run_id}\n" + run_output
     from .data_access import discover_files

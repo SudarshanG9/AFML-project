@@ -228,3 +228,168 @@ def readiness_is_current(result) -> bool:
         return True
     except OSError:
         return False
+
+
+def load_experiment_results(root: Path, run_directory: str | Path) -> dict[str, Any]:
+    """Load a single run with explicit identity guards, never aggregate arbitrary files."""
+    from .data_access import validate_predictions, validate_benchmarks, validate_metrics_report
+    from .run_inspection import optional_metadata, manifest_structure_valid
+    run = authorized_path(root, run_directory)
+    if not run.is_relative_to((root / 'artifacts').resolve()) or not run.is_dir():
+        raise ValueError('Choose a discovered run directory under repository artifacts.')
+    out: dict[str, Any] = dict(run_dir=str(run), errors=[], predictions=[], benchmarks=[], metrics=None,
+                              available_artifacts=[], completion_recorded=False)
+    for name in ('execution_summary.json', 'failure_summary.json', 'run_manifest.json',
+                 'resolved_config.json', 'provenance.json', 'environment_report.json', 'stage_profile.json'):
+        path = authorized_path(root, run / name)
+        if not path.is_relative_to(run):
+            out['errors'].append(f'{name} escapes the run directory'); continue
+        value, error = optional_metadata(path)
+        out[name] = value
+        if error: out['errors'].append(error)
+        if path.is_file(): out['available_artifacts'].append(path)
+    summary = out.get('execution_summary.json') or {}
+    run_id = summary.get('run_id')
+    sha = summary.get('checkpoint_sha256')
+    out['run_id'] = run_id or run.name
+    out['split'] = summary.get('split')
+    out['requested_modes'] = summary.get('requested_modes', [])
+    manifest = out.get('run_manifest.json')
+    out['completion_recorded'] = bool(summary.get('status') == 'complete'
+        and summary.get('dataset_complete') is True and out['split'] == 'val'
+        and manifest_structure_valid(manifest) and manifest.get('run_id') == run_id
+        and not out.get('failure_summary.json') and not (run / 'failure_summary.json').exists())
+    for name, key in (('predictions.jsonl', 'predictions'), ('benchmark_records.jsonl', 'benchmarks')):
+        path = authorized_path(root, run / name)
+        if not path.is_relative_to(run):
+            out['errors'].append(f'{name} escapes the run directory'); continue
+        if not path.is_file(): continue
+        out['available_artifacts'].append(path)
+        try:
+            rows = load_jsonl(path)
+            errors = (validate_predictions(rows, root / 'contracts/schemas/prediction.schema.json')
+                      if key == 'predictions' else validate_benchmarks(rows, root / 'contracts/schemas/benchmark.schema.json', run_dir=run))
+            if not rows: errors.append('No records')
+            if summary.get('data_origin') != 'real_cached_features':
+                errors.append('Synthetic or unspecified origin: scores/timings are not detector evidence.')
+            if not run_id or not sha or out['split'] != 'val':
+                errors.append('Validation run identity is not established by execution_summary.json.')
+            if any(row.get('run_id') != run_id for row in rows): errors.append('Records belong to another run ID.')
+            if key == 'predictions':
+                if any(row.get('split') != 'val' or row.get('checkpoint_sha256') != sha for row in rows):
+                    errors.append('Prediction split/checkpoint differs from the selected run.')
+                pred = summary.get('predictions') or {}
+                if not isinstance(pred, dict):
+                    pred = {}
+                    errors.append('Invalid prediction summary structure.')
+                if pred.get('n_rows') is not None and len(rows) != pred['n_rows']:
+                    errors.append('Prediction row count differs from execution summary.')
+                if summary.get('predictions_sha256') and checkpoint_digest(path) != summary['predictions_sha256']:
+                    errors.append('Predictions differ from the execution summary hash.')
+            else:
+                if any(row.get('workload', {}).get('checkpoint_sha256') != sha for row in rows):
+                    errors.append('Benchmark checkpoint differs from the selected run.')
+            if errors:
+                out['errors'].extend(f'{name}: {error}' for error in errors)
+            else:
+                out[key] = rows
+        except (OSError, ValueError, RuntimeError) as exc:
+            out['errors'].append(f'{name}: {exc}')
+    out['available_modes'] = sorted({row['config'] for row in out['predictions']})
+    out['missing_modes'] = [mode for mode in __import__('avfuse.shared.contracts', fromlist=['PRECISION_MODES']).PRECISION_MODES
+                            if mode not in out['available_modes']]
+    # Only reports with a frontend evaluation receipt bound to these exact predictions are associated.
+    evaluation_root = root / 'artifacts/member3/evaluations' / run.name
+    if evaluation_root.is_dir():
+        for receipt_path in sorted(evaluation_root.glob('*/receipt.json'), reverse=True):
+            try:
+                receipt_path = authorized_path(root, receipt_path)
+                receipt = load_json(receipt_path)
+                pred_path = run / 'predictions.jsonl'
+                metric_path = authorized_path(root, receipt_path.parent / 'metrics.json')
+                if (receipt.get('run_id') != run_id or receipt.get('split') != 'val'
+                        or receipt.get('predictions_sha256') != checkpoint_digest(pred_path)
+                        or receipt.get('checkpoint_sha256') != sha
+                        or receipt.get('metrics_sha256') != checkpoint_digest(metric_path)):
+                    continue
+                report = load_json(metric_path)
+                if validate_metrics_report(report) or report.get('split') != 'val': continue
+                if report.get('manifest_sha256') != summary.get('features', {}).get('manifest_sha256'): continue
+                out.update(metrics=report, evaluation_receipt=receipt, evaluation_path=metric_path)
+                out['available_artifacts'].extend([metric_path, receipt_path])
+                break
+            except (OSError, ValueError):
+                continue
+    return out
+
+
+def evaluate_validation_results(root: Path, run_directory: str | Path, protocol: str):
+    """Invoke existing Member 2 evaluation, without calibration or test access."""
+    import json
+    import subprocess
+    import sys
+    import uuid
+    from .backend_status import RunResult, _command_env
+    from avfuse.member2_data.predictions import by_config, join
+    from .data_access import validate_metrics_report
+    details = {'phase': 'evaluation_preflight', 'cli_launched': False, 'status': 'not_ready'}
+    try:
+        result = load_experiment_results(root, run_directory)
+        if not result['completion_recorded'] or not result['predictions']:
+            raise ValueError('Evaluation requires completed validation inference and valid predictions.')
+        summary = result['execution_summary.json']
+        if summary.get('data_origin') != 'real_cached_features':
+            raise ValueError('Synthetic/development artifacts are not detector evaluation evidence.')
+        manifest = authorized_path(root, summary['features']['manifest'])
+        rows = load_jsonl(manifest)
+        errors = validate_manifest(rows, root / 'contracts/schemas/manifest.schema.json')
+        if errors or not rows or any(row.get('split') != 'val' for row in rows):
+            raise ValueError('Evaluation requires a schema-valid validation-only manifest with labels.')
+        if checkpoint_digest(manifest) != summary['features']['manifest_sha256']:
+            raise ValueError('Manifest bytes differ from the inference run.')
+        protocol_path = authorized_path(root, protocol)
+        frozen = load_json(protocol_path)
+        release = load_json(root / 'docs/member1/dayC/releases/M2-REL-20261113-01/m2_release.json')
+        if (frozen.get('calibration_split') != 'val' or frozen.get('calibration_config') != 'reference'
+                or frozen.get('threshold') != release['fixed_threshold']
+                or frozen.get('manifest_sha256') != checkpoint_digest(manifest)
+                or frozen.get('checkpoint_sha256') != summary['checkpoint_sha256']):
+            raise ValueError('Frozen protocol must match this exact validation manifest/checkpoint and the original validation-fixed threshold. No recalibration is performed.')
+        for block in by_config(result['predictions']).values():
+            joined = join(rows, block, 'val')
+            if {row['label'] for row in joined} != {0, 1}:
+                raise ValueError('Label-grounded evaluation requires real and fake validation examples.')
+        # Keep derived evaluation outside the finalized inference bundle.
+        output = authorized_path(root, root / 'artifacts/member3/evaluations' / Path(run_directory).name / uuid.uuid4().hex)
+        if not output.is_relative_to(root.resolve()):
+            raise ValueError('Evaluation output must stay in the repository.')
+        prediction_path = Path(result['run_dir']) / 'predictions.jsonl'
+        command = [sys.executable, str(root / 'scripts/m2_evaluate.py'), 'evaluate', '--manifest', str(manifest),
+                   '--predictions', str(prediction_path), '--protocol', str(protocol_path), '--split', 'val',
+                   '--n-boot', '1000', '--seed', '0', '--out', str(output)]
+        input_hashes = {str(path): checkpoint_digest(path) for path in (manifest, prediction_path, protocol_path)}
+    except (OSError, ValueError, KeyError) as exc:
+        return RunResult(2, f'Label-grounded evaluation not performed: {exc}', details)
+    details.update(phase='evaluation', cli_launched=True)
+    try:
+        proc = subprocess.run(command, cwd=root, env=_command_env(root), capture_output=True, text=True,
+                              timeout=1800, check=False)
+        if proc.returncode:
+            return RunResult(proc.returncode, proc.stdout + '\n' + proc.stderr, {**details, 'status': 'failed'})
+        report = load_json(output / 'metrics.json')
+        if (validate_metrics_report(report) or report.get('split') != 'val'
+                or report.get('manifest_sha256') != input_hashes[str(manifest)]
+                or report.get('threshold') != frozen['threshold']
+                or report.get('n_boot') != 1000 or report.get('seed') != 0
+                or set(report['configs']) != set(result['available_modes'])
+                or any(checkpoint_digest(Path(path)) != sha for path, sha in input_hashes.items())):
+            raise ValueError('Evaluator output or inputs changed; report cannot be associated with this run.')
+        receipt = dict(run_id=result['run_id'], split='val', checkpoint_sha256=summary['checkpoint_sha256'],
+                       predictions_sha256=input_hashes[str(prediction_path)], manifest_sha256=input_hashes[str(manifest)],
+                       protocol_sha256=input_hashes[str(protocol_path)], metrics_sha256=checkpoint_digest(output / 'metrics.json'))
+        (output / 'receipt.json').write_text(json.dumps(receipt, indent=2))
+        return RunResult(0, 'Member 2 label-grounded validation evaluation completed.', {**details, 'status': 'complete', 'output': str(output)})
+    except subprocess.TimeoutExpired:
+        return RunResult(124, 'Evaluation exceeded 1800 seconds; evaluation completion is not established.', {**details, 'status': 'timeout'})
+    except (OSError, ValueError) as exc:
+        return RunResult(1, f'Evaluation report unavailable: {exc}', {**details, 'status': 'failed'})

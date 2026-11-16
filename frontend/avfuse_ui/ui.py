@@ -699,10 +699,10 @@ def _metric_value(metric: Any) -> tuple[float | None, str]:
     return None, ""
 
 
-def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
+def render_evaluation(root: Path, files: dict[str, list[Path]], *, imported_only=False) -> None:
     page_header("FORENSIC EVALUATION / MEMBER 2", "Evaluation results",
                 "Overall and manipulation-stratified metrics, with validation-frozen thresholds and source-cluster confidence intervals.")
-    display_mode = st.radio("Evaluation source", ["Saved research results", "Imported evaluation artifact"])
+    display_mode = "Imported evaluation artifact" if imported_only else st.radio("Evaluation source", ["Saved research results", "Imported evaluation artifact"])
     if display_mode == "Saved research results":
         from .data_access import saved_result_table
         st.info("Saved research results: committed source-bound aggregate presentations; no evaluation is executed.")
@@ -830,13 +830,13 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
     st.info("No evaluation available: select a structured metrics.json or choose Saved research results.")
 
 
-def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
+def render_benchmarks(root: Path, files: dict[str, list[Path]], *, imported_only=False) -> None:
     st.session_state["artifact_import_failed"] = False
     page_header("RUNTIME / MEMBER 3", "Benchmark explorer",
                 "Read the Member 3 benchmark records without conflating operator, cached-feature model, or preprocessing costs.")
     st.markdown("<div class='avf-warn'><b>Precision disclosure:</b> all non-reference configurations are simulated fake quantization in floating-point arithmetic. The runtime records do not measure a real INT8 kernel or prove INT8 hardware speedup.</div>", unsafe_allow_html=True)
 
-    display_mode = st.radio("Benchmark source", ["Saved CPU research results", "Imported benchmark records"])
+    display_mode = "Imported benchmark records" if imported_only else st.radio("Benchmark source", ["Saved CPU research results", "Imported benchmark records"])
     if display_mode == "Saved CPU research results":
         from .data_access import saved_result_table
         st.info("Saved CPU evidence: cached_feature_model scope; three workloads × four modes. Not raw-video end-to-end latency or native INT8 acceleration. Peak CPU memory was not measured.")
@@ -1139,6 +1139,11 @@ MODE_HELP = {
 }
 
 
+def _open_saved_results():
+    st.session_state["result_source"] = "Saved evidence"
+    _open_results()
+
+
 def _open_results():
     st.session_state["workbench_page"] = "Results"
 
@@ -1177,7 +1182,7 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
             st.caption(MODE_HELP[mode])
         if saved:
             st.info("Explore the accepted LAV-DF study, its source-bound metrics and recorded CPU costs.")
-            st.button("View accepted results", type="primary", on_click=_open_results)
+            st.button("View accepted results", type="primary", on_click=_open_saved_results)
         else:
             st.write("**Dataset: LAV-DF · validation only**")
             st.caption("Assets required. No raw media upload or held-out test execution.")
@@ -1252,15 +1257,8 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
 
 
 def render_results(root: Path, files: dict[str, list[Path]]) -> None:
-    st.subheader("Results")
-    st.info("Saved evidence · accepted historical research, not a new inference run.")
-    evaluation, costs, technical = st.tabs(["Performance", "Computational cost", "Technical details"])
-    with evaluation:
-        render_evaluation(root, files)
-    with costs:
-        render_benchmarks(root, files)
-    with technical:
-        render_runs(root, files)
+    from .workbench_results import render
+    render(root, files)
 
 
 def render_about(root: Path, files: dict[str, list[Path]]) -> None:

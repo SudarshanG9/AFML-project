@@ -63,7 +63,7 @@ def test_wrapper_structured_validation_only(monkeypatch, inputs, code):
     def run(cmd, **kwargs):
         calls.append(cmd)
         return SimpleNamespace(returncode=0 if len(calls) == 1 else code,
-                               stdout=json.dumps({'ok': True, 'status': 'complete', 'finalized': True}), stderr='')
+                               stdout=json.dumps({'ok': True, 'status': 'complete', 'finalized': True, 'run_id': inputs['run_id'], 'split': 'val', 'checkpoint_sha256': __import__('avfuse.member2_data.readiness', fromlist=['DIMODIF_LAVDF_SHA256']).DIMODIF_LAVDF_SHA256, 'dataset_complete': True, 'requested_modes': inputs['modes']}), stderr='')
     monkeypatch.setattr(service.subprocess, 'run', run)
     actual, output = service.run_cached_feature_experiment(ROOT, **inputs)
     assert actual == code

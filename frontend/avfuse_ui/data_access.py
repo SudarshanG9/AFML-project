@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -103,6 +104,10 @@ def validate_predictions(rows: list[dict[str, Any]], schema_path: Path) -> list[
         seen.add(key)
         if "checkpoint_sha256" in row:
             checkpoints.add(str(row["checkpoint_sha256"]))
+        score = row.get("score_fake")
+        if (not isinstance(score, (int, float)) or isinstance(score, bool)
+                or not math.isfinite(score) or not 0 <= score <= 1):
+            errors.append(f"row {idx}: score_fake must be a finite probability in [0, 1]")
         if "label" in row or "ground_truth" in row:
             errors.append(f"row {idx}: prediction rows must not contain ground-truth labels")
 
@@ -158,6 +163,29 @@ def validate_metrics_report(obj: dict[str, Any]) -> list[str]:
         per_type = block.get("per_type", {})
         if isinstance(per_type, dict) and any(not isinstance(value, dict) for value in per_type.values()):
             errors.append(f"{cfg}.per_type entries must be objects")
+    # Optional threshold metrics and per-type blocks must also be safe to render.
+    def check_metric(value, where, probability=True):
+        if not isinstance(value, dict) or not all(key in value for key in ("value", "ci_low", "ci_high")):
+            errors.append(f"{where} is missing value/ci_low/ci_high")
+            return
+        numbers = [value[key] for key in ("value", "ci_low", "ci_high")]
+        if any(not isinstance(x, (int, float)) or isinstance(x, bool) or not math.isfinite(x) for x in numbers):
+            errors.append(f"{where} must contain finite numeric values")
+        elif any(x < 0 or (probability and x > 1) for x in numbers) or numbers[1] > numbers[2]:
+            errors.append(f"{where} has invalid metric range or confidence interval")
+    for cfg, block in configs.items():
+        if not isinstance(block, dict): continue
+        for name in ("auroc", "auprc", "bce", "recall", "real_fpr"):
+            if name in block: check_metric(block[name], f"{cfg}.{name}", name != "bce")
+        if isinstance(block.get("per_type"), dict):
+            for kind, strata in block["per_type"].items():
+                if not isinstance(strata, dict): continue
+                for name in ("auroc", "auprc", "recall"):
+                    if name in strata: check_metric(strata[name], f"{cfg}.per_type.{kind}.{name}")
+    threshold = obj.get("threshold")
+    if threshold is not None and (not isinstance(threshold, (int, float)) or isinstance(threshold, bool)
+                                  or not math.isfinite(threshold) or not 0 <= threshold <= 1):
+        errors.append("threshold must be a finite probability")
     paired = obj.get("paired", [])
     if not isinstance(paired, list) or any(not isinstance(item, dict) or
             not isinstance(item.get("metrics", {}), dict) or
