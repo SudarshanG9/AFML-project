@@ -1139,6 +1139,21 @@ MODE_HELP = {
 }
 
 
+def _use_registered_manifest():
+    value = st.session_state["registered_manifest"]
+    if value != "Enter a path":
+        st.session_state["draft_manifest"] = value
+        st.session_state.setdefault("experiment_draft", {})["manifest"] = value
+
+
+def _open_generated_results():
+    last = st.session_state.get("last_run_result", {})
+    if last.get("run_dir"):
+        st.session_state["selected_run"] = last["run_dir"]
+        st.session_state["result_source"] = "New validation run"
+    _open_results()
+
+
 def _open_saved_results():
     st.session_state["result_source"] = "Saved evidence"
     _open_results()
@@ -1166,7 +1181,7 @@ def _journey(stage=1):
 
 
 def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
-    _journey()
+    journey = st.empty()
     left, right = st.columns([1.55, 1], gap="large")
     with left, st.container(border=True):
         st.subheader("Experiment setup")
@@ -1187,6 +1202,14 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
             st.write("**Dataset: LAV-DF · validation only**")
             st.caption("Assets required. No raw media upload or held-out test execution.")
             with st.expander("Execution settings"):
+                from .workbench_service import available_validation_manifests
+                manifests = available_validation_manifests(root, files.get("manifests", []))
+                if manifests:
+                    st.selectbox("Available validation manifests", ["Enter a path", *[str(p) for p in manifests]],
+                        format_func=lambda x: str(Path(x).relative_to(root)) if x != "Enter a path" else x,
+                        key="registered_manifest", on_change=_use_registered_manifest)
+                else:
+                    st.caption("No schema-valid LAV-DF validation manifests discovered. Supply an authorized manifest path below.")
                 _draft_widget("text_input", "External DiMoDif checkout", "upstream_root", "")
                 _draft_widget("text_input", "Validation manifest", "manifest", "")
                 _draft_widget("text_input", "Feature root", "feature_root", "")
@@ -1202,6 +1225,10 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
             if st.session_state.get("authorization_request") != request:
                 st.session_state["authorization_request"] = request
                 st.session_state.pop("readiness", None)
+                st.session_state["draft_authorized"] = False
+                draft["authorized"] = False
+            prior_readiness = st.session_state.get("readiness")
+            if prior_readiness and prior_readiness.code == 0 and not readiness_is_current(prior_readiness):
                 st.session_state["draft_authorized"] = False
                 draft["authorized"] = False
             authorized = _draft_widget("checkbox", "I authorize validation inference with these trusted local assets.", "authorized", False)
@@ -1227,6 +1254,7 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
                 with st.spinner("Executing the validation cohort and cached-feature benchmark…"):
                     outcome = execute_validation_experiment(root, **request)
                 st.session_state["last_run_result"] = {"exit_code": outcome.code, **outcome.payload}
+                st.session_state["last_execution_request"] = request
                 st.session_state["run_diagnostics"] = outcome.diagnostics
                 st.session_state.pop("readiness", None)
                 if outcome.payload.get("run_dir"):
@@ -1236,6 +1264,7 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
                 st.rerun()
             last = st.session_state.get("last_run_result")
             if last:
+                st.caption(f"Most recent submission · run {last.get('run_id', 'not started')}")
                 if last.get("status") == "complete" and last.get("exit_code") == 0:
                     st.success("Inference completed. Label-grounded evaluation has not been performed.")
                 elif last.get("phase") == "preflight":
@@ -1245,7 +1274,8 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
                 with st.expander("Execution details"):
                     st.json(last)
                     st.code(st.session_state.get("run_diagnostics", ""), language="text")
-                st.button("Open generated results", on_click=_open_results)
+                st.button("Open generated results", on_click=_open_generated_results,
+                          disabled=not bool(last.get("run_dir") and Path(last["run_dir"]).is_dir()))
     with right, st.container(border=True):
         st.subheader("Results preview")
         st.write("One performance table, one manipulation chart and one cost comparison.")
@@ -1254,6 +1284,18 @@ def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
         st.write("Overall degradation from simulated low precision and a V/output restoration advantage were not statistically established.")
         st.caption("Confidence intervals crossing zero do not establish equivalence.")
         st.button("Investigate results →", on_click=_open_results)
+
+    stage = 1
+    if not saved:
+        readiness = st.session_state.get("readiness")
+        if readiness and readiness.code == 0 and readiness_is_current(readiness):
+            stage = 2
+        last = st.session_state.get("last_run_result", {})
+        if (last.get("exit_code") == 0 and last.get("status") == "complete"
+                and st.session_state.get("last_execution_request") == request):
+            stage = 3
+    with journey:
+        _journey(stage)
 
 
 def render_results(root: Path, files: dict[str, list[Path]]) -> None:

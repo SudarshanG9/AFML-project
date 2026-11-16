@@ -393,3 +393,18 @@ def evaluate_validation_results(root: Path, run_directory: str | Path, protocol:
         return RunResult(124, 'Evaluation exceeded 1800 seconds; evaluation completion is not established.', {**details, 'status': 'timeout'})
     except (OSError, ValueError) as exc:
         return RunResult(1, f'Evaluation report unavailable: {exc}', {**details, 'status': 'failed'})
+
+
+def available_validation_manifests(root: Path, paths: list[Path]) -> list[Path]:
+    """Register only actual, schema-valid LAV-DF validation manifests; no asset inference."""
+    available = []
+    for path in paths:
+        try:
+            path = authorized_path(root, path)
+            rows = load_jsonl(path)
+            if (rows and all(row.get('split') == 'val' and str(row.get('dataset', '')).lower() == 'lavdf' for row in rows)
+                    and not validate_manifest(rows, root / 'contracts/schemas/manifest.schema.json')):
+                available.append(path)
+        except (OSError, ValueError):
+            continue
+    return available

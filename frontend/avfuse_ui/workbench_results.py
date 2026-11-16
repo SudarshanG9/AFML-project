@@ -243,9 +243,9 @@ def _run(root, files):
         if st.button('Evaluate validation labels', disabled=not (result['completion_recorded'] and bool(protocol.strip()))):
             with st.spinner('Running the existing Member 2 evaluator…'):
                 outcome = evaluate_validation_results(root, run, protocol)
-            st.session_state['evaluation_outcome'] = dict(code=outcome.code, message=outcome.diagnostics)
+            st.session_state.setdefault('evaluation_outcomes', {})[run] = dict(code=outcome.code, message=outcome.diagnostics)
             if not outcome.code: st.rerun()
-        outcome = st.session_state.get('evaluation_outcome')
+        outcome = st.session_state.get('evaluation_outcomes', {}).get(run)
         if outcome:
             (st.success if outcome['code'] == 0 else st.warning)(outcome['message'])
     _technical_run(root, result)

@@ -20,6 +20,11 @@ if not (root / "pyproject.toml").is_file() or not (root / "src/avfuse").is_dir()
 if str(root / "src") not in sys.path:
     sys.path.insert(0, str(root / "src"))
 
+# Preserve selected result source/run when their widgets are hidden by navigation.
+for key in ("result_source", "selected_run"):
+    if key in st.session_state:
+        st.session_state[key] = st.session_state[key]
+
 with st.sidebar:
     st.title("DeepTrace")
     st.caption("Precision Experimentation Workbench")

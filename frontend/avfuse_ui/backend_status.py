@@ -127,8 +127,8 @@ def _invoke_cached_feature_experiment(
     assets = inspect_experiment_assets(root, **request)
     details = asdict(assets)
     if not assets.ready:
-        return RunResult(assets.code, "Readiness check failed. No experiment CLI was launched.\n"
-                         + "\n".join(assets.errors + assets.missing_assets), details)
+        return RunResult(assets.code, "Readiness check failed. No experiment CLI was launched.\n\n"
+                         + "\n".join("- " + message for message in dict.fromkeys(assets.errors + assets.missing_assets)), details)
     common = _common_args(assets.request)
     env = _command_env(root)
     validate_cmd = [sys.executable, "-m", "avfuse.member3_runtime.cli", "validate-config", *common, "--json"]
