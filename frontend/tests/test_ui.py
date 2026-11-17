@@ -5,8 +5,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 ROOT = Path(__file__).resolve().parents[2]
-PAGES = ['Overview', 'Dataset & features', 'Fusion diagnostics', 'Demo & predictions',
-         'Evaluation', 'Benchmarks', 'Runs & system', 'Artifact import']
+PAGES = ['Experiment', 'Results', 'About']
 
 
 @pytest.mark.parametrize('page', PAGES)
@@ -19,27 +18,35 @@ def test_every_page_renders_without_model_assets(page, monkeypatch):
     assert not app.exception
     app.sidebar.radio[0].set_value(page).run()
     assert not app.exception
-    if page == 'Evaluation':
-        assert sum(len(table.value) for table in app.dataframe) == 20 + 36 + 80 + 20
-    if page == 'Benchmarks':
-        assert sum(len(table.value) for table in app.dataframe) == 12 + 600
+    assert list(app.sidebar.radio[0].options) == PAGES
 
 
 @pytest.mark.parametrize('page,label', [('Evaluation', 'Imported evaluation artifact'), ('Benchmarks', 'Imported benchmark records')])
 def test_empty_import_mode_does_not_mix_saved_results(page, label):
-    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
-    app.sidebar.radio[0].set_value(page).run()
+    app = legacy_page(page)
     next(r for r in app.radio if r.label.endswith('source')).set_value(label).run()
     assert not app.exception
     assert not app.dataframe
     assert app.info
 
 
-def test_refresh_and_dirty_status():
+def legacy_page(page):
+    name = {'Evaluation': 'render_evaluation', 'Benchmarks': 'render_benchmarks',
+            'Demo & predictions': 'render_demo'}[page]
+    return AppTest.from_string(f"from pathlib import Path\nfrom avfuse_ui.ui import {name}\nfrom avfuse_ui.data_access import discover_files\nroot=Path({str(ROOT)!r})\n{name}(root, discover_files(root))", default_timeout=30).run()
+
+
+def test_landing_and_draft_survive_navigation():
     app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
-    next(b for b in app.button if b.label == 'Refresh discovered artifacts').click().run()
-    assert not app.exception
-    assert any('Working tree dirty:' in item.value and 'unknown' not in item.value.split('Working tree dirty:')[1] for item in app.markdown)
+    assert app.sidebar.radio[0].value == 'Experiment'
+    app.radio(key='draft_source').set_value('Run new validation experiment').run()
+    app.text_input(key='draft_manifest').set_value('my-validation.jsonl').run()
+    app.multiselect(key='draft_modes').set_value(['reference', 'restore_query']).run()
+    app.sidebar.radio[0].set_value('About').run()
+    app.sidebar.radio[0].set_value('Experiment').run()
+    assert app.text_input(key='draft_manifest').value == 'my-validation.jsonl'
+    assert app.multiselect(key='draft_modes').value == ['reference', 'restore_query']
+    assert next(b for b in app.button if b.label == 'Run Experiment').disabled
 
 
 def test_malformed_multi_file_import_blocks_comparison(tmp_path, monkeypatch):
@@ -49,8 +56,7 @@ def test_malformed_multi_file_import_blocks_comparison(tmp_path, monkeypatch):
     good.write_text(json.dumps(dict(run_id='synthetic', split='val', clip_id='c', config='reference', score_fake=.5, checkpoint_sha256='a'*64))+'\n')
     bad = tmp_path / 'broken.jsonl'; bad.write_text('not json')
     monkeypatch.setattr(ui, 'choose_many_local_or_upload', lambda *a, **k: ([good, bad], None))
-    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
-    app.sidebar.radio[0].set_value('Demo & predictions').run()
+    app = legacy_page('Demo & predictions')
     assert not app.exception
     assert any('broken.jsonl' in item.value for item in app.error)
     assert not app.success
@@ -64,8 +70,7 @@ def test_imported_metrics_are_not_replaced_by_saved_tables(tmp_path, monkeypatch
     metric = dict(value=.5, ci_low=.4, ci_high=.6)
     path.write_text(json.dumps(dict(split='val', configs={'reference': dict(auroc=metric, auprc=metric, bce=metric, per_type={})})))
     monkeypatch.setattr(ui, 'choose_local_or_upload', lambda *a, **k: (path, None))
-    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
-    app.sidebar.radio[0].set_value('Evaluation').run()
+    app = legacy_page('Evaluation')
     next(r for r in app.radio if r.label == 'Evaluation source').set_value('Imported evaluation artifact').run()
     assert not app.exception
     assert len(app.dataframe) == 1
@@ -77,9 +82,77 @@ def test_malformed_metrics_object_has_useful_error(tmp_path, monkeypatch):
     from avfuse_ui import ui
     path = tmp_path / 'metrics.json'; path.write_text('{"split":"val","configs":{"reference":null}}')
     monkeypatch.setattr(ui, 'choose_local_or_upload', lambda *a, **k: (path, None))
-    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
-    app.sidebar.radio[0].set_value('Evaluation').run()
+    app = legacy_page('Evaluation')
     next(r for r in app.radio if r.label == 'Evaluation source').set_value('Imported evaluation artifact').run()
     assert not app.exception
     assert app.error
     assert not app.success
+
+
+def test_readiness_failure_has_no_cli_attribution_or_id_reservation():
+    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
+    app.radio(key='draft_source').set_value('Run new validation experiment').run()
+    app.text_input(key='draft_run_id').set_value('reusable-id').run()
+    next(b for b in app.button if b.label == 'Check Readiness').click().run()
+    assert not app.exception
+    assert any('No experiment CLI was launched' in e.value for e in app.error)
+    assert next(b for b in app.button if b.label == 'Run Experiment').disabled
+    assert 'submitted_runs' not in app.session_state
+    next(b for b in app.button if b.label == 'Check Readiness').click().run()
+    assert app.text_input(key='draft_run_id').value == 'reusable-id'
+
+
+def test_authorization_persists_navigation_and_resets_with_assets():
+    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
+    app.radio(key='draft_source').set_value('Run new validation experiment').run()
+    app.checkbox(key='draft_authorized').check().run()
+    app.sidebar.radio[0].set_value('About').run()
+    app.sidebar.radio[0].set_value('Experiment').run()
+    assert app.checkbox(key='draft_authorized').value
+    app.text_input(key='draft_manifest').set_value('changed.jsonl').run()
+    assert not app.checkbox(key='draft_authorized').value
+
+
+def test_result_source_survives_navigation():
+    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
+    app.sidebar.radio[0].set_value('Results').run()
+    app.radio(key='result_source').set_value('Imported artifacts').run()
+    app.sidebar.radio[0].set_value('About').run()
+    app.sidebar.radio[0].set_value('Results').run()
+    assert app.radio(key='result_source').value == 'Imported artifacts'
+    assert not app.exception
+
+
+def test_about_includes_joint_attention_and_negative_findings():
+    app = AppTest.from_file(str(ROOT / 'frontend/app.py'), default_timeout=30).run()
+    app.sidebar.radio[0].set_value('About').run()
+    content=' '.join(e.value for kind in (app.markdown, app.caption, app.warning) for e in kind)
+    assert 'joint-sequence' in content
+    assert 'not statistically established' in content
+    assert 'not integer-kernel deployment' in content
+    assert 'validation-only' in content
+
+
+def test_verified_readiness_and_authorization_enable_execution(monkeypatch):
+    from avfuse_ui import workbench_service
+    from avfuse_ui.backend_status import RunResult
+    calls=[]
+    monkeypatch.setattr(workbench_service, 'validate_experiment_readiness', lambda *a,**k: RunResult(0,'Assets checked',dict(status='ready',phase='readiness')))
+    monkeypatch.setattr(workbench_service, 'readiness_is_current', lambda result: True)
+    def execute(*args, **kwargs):
+        calls.append(kwargs)
+        return RunResult(4, 'Fixture incomplete run', dict(phase='execution', status='incomplete', cli_launched=True))
+    monkeypatch.setattr(workbench_service,'execute_validation_experiment',execute)
+    app=AppTest.from_file(str(ROOT/'frontend/app.py'), default_timeout=30).run()
+    app.radio(key='draft_source').set_value('Run new validation experiment').run()
+    app.text_input(key='draft_run_id').set_value('fixture-run').run()
+    app.checkbox(key='draft_authorized').check().run()
+    next(b for b in app.button if b.label=='Check Readiness').click().run()
+    assert not next(b for b in app.button if b.label=='Run Experiment').disabled
+    assert any('<b>2. Run Experiment</b>' in e.value for e in app.markdown)
+    next(b for b in app.button if b.label=='Run Experiment').click().run()
+    assert not app.exception and len(calls)==1
+    assert calls[0]['modes']==list(__import__('avfuse_ui.data_access',fromlist=['CONFIGS']).CONFIGS)
+    assert any('incomplete' in e.value for e in app.warning)
+    assert not any('Inference completed' in e.value for e in app.success)
+    assert next(b for b in app.button if b.label=='Run Experiment').disabled

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import os
 import json
-import re
-import uuid
 from dataclasses import dataclass, field
 import subprocess
 import sys
@@ -117,75 +115,43 @@ def _invoke_cached_feature_experiment(
     root: Path, *, upstream_root: str, checkpoint_name: str, manifest: str,
     feature_root: str, feature_format: str, device: str, modes: Sequence[str],
     run_id: str = "", experiment_id: str = "", require_lavdf_hash: bool = True,
-    timeout_seconds: int = 86400,
-) -> tuple[int, str]:
+    timeout_seconds: int = 86400, validate_only: bool = False,
+) -> RunResult:
     """Validate then run real cached-feature inference on validation only."""
-    from avfuse.shared.contracts import PRECISION_MODES
-    from avfuse.member1_fusion.dimodif_adapter import CHECKPOINTS
-    from .data_access import load_jsonl, validate_manifest, authorized_path
-    if not modes or any(mode not in PRECISION_MODES for mode in modes):
-        return 2, "Select at least one precision mode."
-    if checkpoint_name not in {"lavdf", "avdeepfake1m"}:
-        return 2, "Select a supported checkpoint name."
-    if feature_format not in {"dimodif_npz", "shared_pt"}:
-        return 2, "Select a supported feature format."
-    if not re.fullmatch(r"cpu|cuda(?::[0-9]+)?|mps", device):
-        return 2, "An explicit supported device is required."
-    if checkpoint_name != "lavdf" or not require_lavdf_hash:
-        return 7, "This study UI requires the frozen LAV-DF checkpoint hash."
-    for value in (run_id, experiment_id):
-        if value and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,95}", value):
-            return 2, "Invalid run or experiment identifier."
-    run_id = run_id or "ui-" + uuid.uuid4().hex
-    if (root / "artifacts/member3/runs" / run_id).exists():
-        return 2, "Run ID already exists; duplicate execution refused."
-    try:
-        upstream = authorized_path(root, upstream_root)
-        manifest_path = authorized_path(root, manifest)
-        features = authorized_path(root, feature_root)
-        checkpoint = upstream / "ckpt/dfd" / (CHECKPOINTS[checkpoint_name] + ".pth")
-        if not features.is_dir() or not checkpoint.is_file() or not checkpoint.with_suffix(".json").is_file():
-            return 6, "Missing feature root, checkpoint or model configuration."
-        rows = load_jsonl(manifest_path)
-        errors = validate_manifest(rows, root / "contracts/schemas/manifest.schema.json")
-        if errors or any(row.get("split") != "val" for row in rows):
-            return 2, "Use a schema-valid validation-only manifest: " + "; ".join(errors[:3])
-        from avfuse.member3_runtime.feature_loader import dimodif_npz_path
-        for row in rows:
-            cache = (dimodif_npz_path(features, "val", row["clip_id"]) if feature_format == "dimodif_npz"
-                     else features / row["feature_path"])
-            cache = authorized_path(root, cache)
-            if not cache.is_relative_to(features) or not cache.is_file():
-                return 6, "Missing cache or cache escapes selected feature root."
-        upstream_root, manifest, feature_root = str(upstream), str(manifest_path), str(features)
-    except (OSError, ValueError) as exc:
-        return 6, str(exc)
-    common = [
-        "--upstream-root", upstream_root, "--checkpoint-name", checkpoint_name,
-        "--manifest", manifest, "--feature-root", feature_root,
-        "--feature-format", feature_format, "--device", device,
-        "--modes", *modes, "--split", "val",
-    ]
-    if checkpoint_name == "lavdf" and require_lavdf_hash:
-        common.append("--require-lavdf-hash")
+    from dataclasses import asdict
+    from .workbench_service import inspect_experiment_assets
+    request = dict(upstream_root=upstream_root, checkpoint_name=checkpoint_name, manifest=manifest,
+                   feature_root=feature_root, feature_format=feature_format, device=device,
+                   modes=list(modes), run_id=run_id, experiment_id=experiment_id,
+                   require_lavdf_hash=require_lavdf_hash)
+    assets = inspect_experiment_assets(root, **request)
+    details = asdict(assets)
+    if not assets.ready:
+        return RunResult(assets.code, "Readiness check failed. No experiment CLI was launched.\n\n"
+                         + "\n".join("- " + message for message in dict.fromkeys(assets.errors + assets.missing_assets)), details)
+    common = _common_args(assets.request)
     env = _command_env(root)
     validate_cmd = [sys.executable, "-m", "avfuse.member3_runtime.cli", "validate-config", *common, "--json"]
     try:
         checked = subprocess.run(validate_cmd, cwd=root, env=env, capture_output=True,
                                  text=True, timeout=300, check=False)
     except subprocess.TimeoutExpired:
-        return 124, "Backend validation exceeded 300 seconds and was stopped."
+        return RunResult(124, "Backend validation exceeded 300 seconds and was stopped.", {**details, "phase": "validate_config", "cli_launched": True, "status": "timeout"})
     except OSError as exc:
-        return 1, f"Could not start backend validation: {exc}"
+        return RunResult(1, f"Could not start backend validation: {exc}", {**details, "phase": "validate_config", "cli_launched": False, "status": "launch_failed"})
+    details.update(phase="validate_config", cli_launched=True, status="not_ready")
     validate_output = (checked.stdout + ("\n" + checked.stderr if checked.stderr else "")).strip()
     if checked.returncode != 0:
-        return checked.returncode, "VALIDATE-CONFIG FAILED\n" + validate_output
+        return RunResult(checked.returncode, "VALIDATE-CONFIG FAILED\n" + validate_output, details)
     try:
         validation = json.loads(checked.stdout)
         if not isinstance(validation, dict) or validation.get("ok") is not True:
             raise ValueError("Missing successful validation status")
     except ValueError as exc:
-        return 1, f"Malformed backend validation JSON: {exc}"
+        return RunResult(1, f"Malformed backend validation JSON: {exc}", details)
+    details.update(validation=validation, status="ready", phase="readiness")
+    if validate_only:
+        return RunResult(0, "Assets and software configuration checked. One bounded cache was inspected; model inference has not been tested.", details)
     run_options = ["--runs-root", "artifacts/member3/runs"]
     if run_id.strip():
         run_options.extend(["--run-id", run_id.strip()])
@@ -196,9 +162,9 @@ def _invoke_cached_feature_experiment(
         executed = subprocess.run(run_cmd, cwd=root, env=env, capture_output=True,
                                   text=True, timeout=timeout_seconds, check=False)
     except subprocess.TimeoutExpired:
-        return 124, "Backend run exceeded its configured time limit. Check the run folder for failure_summary.json."
+        return RunResult(124, "Backend run exceeded its configured time limit. Inspect its run folder.", {**details, "phase": "execution", "cli_launched": True, "status": "timeout", "run_dir": str(root / "artifacts/member3/runs" / run_id)})
     except OSError as exc:
-        return 1, f"Could not start backend run: {exc}"
+        return RunResult(1, f"Could not start backend run: {exc}", {**details, "phase": "execution", "cli_launched": False, "status": "launch_failed"})
     run_output = (executed.stdout + ("\n" + executed.stderr if executed.stderr else "")).strip()
     from avfuse.member3_runtime.cli import EXIT_NAMES
     if executed.returncode == 0:
@@ -206,12 +172,27 @@ def _invoke_cached_feature_experiment(
             result = json.loads(executed.stdout)
             if not isinstance(result, dict) or result.get("status") != "complete" or result.get("finalized") is not True:
                 raise ValueError("Successful exit lacks completed and finalized status")
-        except ValueError as exc:
-            return 1, f"Malformed backend run JSON: {exc}"
+            from avfuse.member2_data.readiness import DIMODIF_LAVDF_SHA256
+            if (result.get("run_id") != run_id or result.get("split") != "val"
+                    or result.get("checkpoint_sha256") != DIMODIF_LAVDF_SHA256
+                    or result.get("dataset_complete") is not True
+                    or set(result.get("requested_modes", [])) != set(modes)):
+                raise ValueError("Successful response does not match the requested validation experiment")
+
+        except (ValueError, TypeError) as exc:
+            return RunResult(1, f"Malformed backend run JSON: {exc}", {**details, "phase": "execution", "cli_launched": True, "status": "invalid_response", "run_dir": str(root / "artifacts/member3/runs" / run_id)})
     run_output = f"Status: {EXIT_NAMES.get(executed.returncode, 'UNKNOWN')}\nRun directory: {root / 'artifacts/member3/runs' / run_id}\n" + run_output
+    from .data_access import discover_files
+    available = discover_files(root)
+    run_dir = root / "artifacts/member3/runs" / run_id
     return RunResult(executed.returncode, run_output,
-                     {"validation": validation, "execution": result if executed.returncode == 0 else None,
-                      "run_dir": str(root / "artifacts/member3/runs" / run_id)})
+                     {**details, "phase": "execution", "cli_launched": True,
+                      "status": "complete" if executed.returncode == 0 else EXIT_NAMES.get(executed.returncode, "unknown").lower(),
+                      "execution": result if executed.returncode == 0 else None,
+                      "run_id": run_id, "run_dir": str(run_dir), "evaluation_available": False,
+                      "available_artifacts": [str(path) for kind in ("predictions", "benchmarks", "metrics")
+                                              for path in available[kind] if path.is_relative_to(run_dir)]})
+
 
 
 @dataclass
@@ -231,3 +212,15 @@ def run_cached_feature_experiment(root: Path, **request: Any) -> RunResult:
     """Expose structured status separately from raw subprocess diagnostics."""
     result = _invoke_cached_feature_experiment(root, **request)
     return result if isinstance(result, RunResult) else RunResult(*result)
+
+
+
+def _common_args(request: dict[str, Any]) -> list[str]:
+    return ["--upstream-root", request["upstream_root"], "--checkpoint-name", "lavdf",
+            "--manifest", request["manifest"], "--feature-root", request["feature_root"],
+            "--feature-format", request["feature_format"], "--device", request["device"],
+            "--modes", *request["modes"], "--split", "val", "--require-lavdf-hash"]
+
+
+def validate_cached_feature_experiment(root: Path, **request: Any) -> RunResult:
+    return _invoke_cached_feature_experiment(root, validate_only=True, **request)

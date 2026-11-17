@@ -42,10 +42,15 @@ def inputs(tmp_path, monkeypatch):
     ckpt = upstream / 'ckpt/dfd' / (CHECKPOINTS['lavdf'] + '.pth')
     ckpt.parent.mkdir(parents=True)
     ckpt.write_bytes(b'fixture, never model loaded')
-    ckpt.with_suffix('.json').write_text('{}')
+    ckpt.with_suffix('.json').write_text(json.dumps({'config': dict(task='dfd', max_length=600, d_model=64, nhead=4, d_hid=64, nlayers=5, win_size=1, feature_pyramid=True)}))
+    (upstream / 'src').mkdir()
+    (upstream / 'src/models.py').write_text('# synthetic source existence fixture')
+    from avfuse_ui import workbench_service
+    from avfuse.member2_data.readiness import DIMODIF_LAVDF_SHA256
+    monkeypatch.setattr(workbench_service, 'checkpoint_digest', lambda p: DIMODIF_LAVDF_SHA256)
     features = tmp_path / 'features'
     features.mkdir()
-    (features / "c.pt").write_bytes(b"synthetic existence fixture, never loaded")
+    torch.save(dict(video_tokens=torch.zeros(2, 768), audio_tokens=torch.zeros(2, 768)), features / "c.pt")
     manifest = tmp_path / 'manifest.jsonl'
     row = dict(clip_id='c', dataset='lavdf', source_id='s', identity_id='i', split='val', label=0, manipulation_type='real', feature_path='c.pt')
     manifest.write_text(json.dumps(row) + '\n')
@@ -58,7 +63,7 @@ def test_wrapper_structured_validation_only(monkeypatch, inputs, code):
     def run(cmd, **kwargs):
         calls.append(cmd)
         return SimpleNamespace(returncode=0 if len(calls) == 1 else code,
-                               stdout=json.dumps({'ok': True, 'status': 'complete', 'finalized': True}), stderr='')
+                               stdout=json.dumps({'ok': True, 'status': 'complete', 'finalized': True, 'run_id': inputs['run_id'], 'split': 'val', 'checkpoint_sha256': __import__('avfuse.member2_data.readiness', fromlist=['DIMODIF_LAVDF_SHA256']).DIMODIF_LAVDF_SHA256, 'dataset_complete': True, 'requested_modes': inputs['modes']}), stderr='')
     monkeypatch.setattr(service.subprocess, 'run', run)
     actual, output = service.run_cached_feature_experiment(ROOT, **inputs)
     assert actual == code

@@ -28,29 +28,23 @@ CFG_LABELS = {
 def inject_styles() -> None:
     st.markdown("""
     <style>
-    :root { --avf-bg: #0b1220; --avf-panel: #111c2e; --avf-line: rgba(148,163,184,.16); }
-    .stApp { background: #0b1220; }
-    [data-testid="stSidebar"] { background: #0e1828; border-right: 1px solid rgba(148,163,184,.14); }
-    [data-testid="stHeader"] { background: rgba(11,18,32,.88); }
-    .block-container { max-width: 1440px; padding-top: 4rem; padding-bottom: 3rem; }
-    .avf-brand { display:flex; align-items:center; gap:.65rem; font-size:1.05rem; font-weight:750; letter-spacing:-.02em; }
-    .avf-mark { width:34px; height:34px; border-radius:11px; display:grid; place-items:center; background:linear-gradient(135deg,#2c80ff,#31b8a6); color:white; font-weight:800; }
-    .avf-eyebrow { color:#7dd3fc; font-size:.72rem; letter-spacing:.13em; text-transform:uppercase; font-weight:700; }
-    .avf-subtitle { color:#9badc4; margin-top:-.35rem; }
-    .avf-card { background:linear-gradient(180deg,rgba(20,34,55,.96),rgba(16,28,46,.96)); border:1px solid rgba(148,163,184,.16); border-radius:16px; padding:16px 18px; height:100%; }
-    .avf-card-label { color:#91a4bd; font-size:.76rem; text-transform:uppercase; letter-spacing:.07em; }
-    .avf-card-value { color:#eff6ff; font-size:1.55rem; font-weight:750; margin-top:.28rem; letter-spacing:-.03em; }
-    .avf-card-foot { color:#91a4bd; font-size:.76rem; margin-top:.18rem; }
-    .avf-note { border:1px solid rgba(56,189,248,.23); background:rgba(14,116,144,.10); padding:12px 14px; border-radius:12px; color:#c4eafa; }
-    .avf-warn { border:1px solid rgba(245,158,11,.25); background:rgba(180,83,9,.10); padding:12px 14px; border-radius:12px; color:#f9dfb4; }
-    .avf-danger { border:1px solid rgba(248,113,113,.25); background:rgba(153,27,27,.10); padding:12px 14px; border-radius:12px; color:#fecaca; }
-    .avf-small { color:#91a4bd; font-size:.82rem; }
-    div[data-testid="stMetric"] { background:rgba(17,28,46,.75); border:1px solid rgba(148,163,184,.14); padding:13px 14px; border-radius:14px; }
-    div[data-testid="stMetricLabel"] p { color:#9badc4; }
-    div[data-testid="stMetricValue"] { color:#eff6ff; }
-    div[data-testid="stDataFrame"] { border:1px solid rgba(148,163,184,.14); border-radius:12px; overflow:hidden; }
-    .stButton>button { border-radius:10px; min-height:2.6rem; }
-    hr { border-color:rgba(148,163,184,.14); }
+    .stApp { background:#fff; color:#20202a; }
+    [data-testid="stSidebar"] { background:#f5f2fc; border-right:1px solid #e8e2f2; }
+    [data-testid="stHeader"] { background:rgba(255,255,255,.95); }
+    .block-container { max-width:1450px; padding-top:2.6rem; padding-bottom:3rem; }
+    h1 { font-size:1.9rem !important; letter-spacing:-.035em; }
+    h2 { font-size:1.35rem !important; }
+    h3 { font-size:1.1rem !important; }
+    .topic { color:#6250a5; background:#f3effb; border-radius:20px; padding:6px 12px; font-size:.8rem; }
+    .journey { border-bottom:1px solid #e8e5ed; padding:12px 0 22px; margin-bottom:24px; color:#77717f; }
+    .journey b { color:#6554c0; }
+    [data-testid="stSidebar"] [role="radiogroup"] label { border-radius:8px; padding:10px; }
+    [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) { background:#e7dff8; color:#5643a0; }
+    [data-testid="stVerticalBlockBorderWrapper"] > div { border-color:#e4e1e9; border-radius:12px; }
+    .avf-subtitle,.avf-small { color:#686370; }
+    .avf-note,.avf-warn,.avf-danger { border:1px solid #e4e1e9; padding:12px; border-radius:10px; }
+    .stButton>button { border-radius:8px; min-height:2.6rem; }
+    hr { border-color:#e8e5ed; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -249,7 +243,7 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
             long = pd.DataFrame([{"Split": split, "Manipulation type": typ.replace("_", " "), "Clips": n}
                                  for split, types in summary["types"].items() for typ, n in types.items()])
             if not long.empty:
-                fig = px.bar(long, x="Split", y="Clips", color="Manipulation type", barmode="group", template="plotly_dark")
+                fig = px.bar(long, x="Split", y="Clips", color="Manipulation type", barmode="group", template="plotly_white")
                 fig.update_layout(height=340, margin=dict(l=10,r=10,t=25,b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                 st.plotly_chart(fig, use_container_width=True)
         panel_title("Inspect one cached feature file", "This reads tensor/array metadata only; it does not call the detector.")
@@ -502,7 +496,7 @@ def render_diagnostics(root: Path, files: dict[str, list[Path]]) -> None:
             if "Score matrix (MiB)" in mem_df and "QKV (MiB)" in mem_df:
                 long = mem_df.melt(id_vars=["Layer"], value_vars=["Score matrix (MiB)", "QKV (MiB)"],
                                    var_name="Estimate", value_name="MiB")
-                fig = px.bar(long, x="Layer", y="MiB", color="Estimate", barmode="group", template="plotly_dark")
+                fig = px.bar(long, x="Layer", y="MiB", color="Estimate", barmode="group", template="plotly_white")
                 fig.update_layout(height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10,r=10,t=25,b=10))
                 st.plotly_chart(fig, use_container_width=True)
         st.caption(f"Source: {memory_source} · Checkpoint SHA-256: `{memory.get('checkpoint_sha256', 'not recorded')}`. Dense score size is not a measurement of SDPA's actual allocation.")
@@ -578,13 +572,14 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
             elif not confirm_inputs:
                 st.warning("Confirm the local checkpoint and feature inputs before starting the run.")
             else:
-                st.session_state.setdefault("submitted_runs", set()).add(run_id)
                 with st.spinner("Validating configuration and running the selected validation modes..."):
                     outcome = run_cached_feature_experiment(
                         root, upstream_root=str(upstream.resolve()), checkpoint_name=checkpoint_name,
                         manifest=str(manifest.resolve()), feature_root=str(features.resolve()),
                         feature_format=feature_format, device=device, modes=modes,
                         run_id=run_id, experiment_id=experiment_id, require_lavdf_hash=require_hash)
+                if outcome.payload.get("phase") == "execution" and outcome.payload.get("cli_launched"):
+                    st.session_state.setdefault("submitted_runs", set()).add(run_id)
                 st.session_state["last_run_result"] = {"exit_code": outcome.code, **outcome.payload}
                 code, output = outcome
                 if outcome.payload:
@@ -595,7 +590,10 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
                 if code == 0:
                     st.success("Backend CLI exited successfully. Evaluate predictions with Member 2 before making research claims.")
                 else:
-                    st.error(f"Backend CLI exited with code {code}. Review the diagnostic output; the run may be blocked or incomplete.")
+                    if outcome.payload.get("phase") == "preflight":
+                        st.error("Readiness check failed. No experiment CLI was launched.")
+                    else:
+                        st.error(f"Backend {outcome.payload.get('phase', 'command')} failed with code {code}.")
                 st.code(output or "No output", language="text")
                 st.caption("A successful command is not research release approval.")
     st.divider()
@@ -635,7 +633,7 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
             plot_df = pd.DataFrame(numeric)
             if "config" in plot_df and "score_fake" in plot_df:
                 fig = px.box(plot_df, x="config", y="score_fake", color="config", points=False,
-                             category_orders={"config": list(CONFIGS)}, template="plotly_dark")
+                             category_orders={"config": list(CONFIGS)}, template="plotly_white")
                 fig.update_layout(height=340, showlegend=False, xaxis_title="Precision configuration",
                                   yaxis_title="score_fake", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
                 st.plotly_chart(fig, use_container_width=True)
@@ -701,10 +699,10 @@ def _metric_value(metric: Any) -> tuple[float | None, str]:
     return None, ""
 
 
-def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
+def render_evaluation(root: Path, files: dict[str, list[Path]], *, imported_only=False) -> None:
     page_header("FORENSIC EVALUATION / MEMBER 2", "Evaluation results",
                 "Overall and manipulation-stratified metrics, with validation-frozen thresholds and source-cluster confidence intervals.")
-    display_mode = st.radio("Evaluation source", ["Saved research results", "Imported evaluation artifact"])
+    display_mode = "Imported evaluation artifact" if imported_only else st.radio("Evaluation source", ["Saved research results", "Imported evaluation artifact"])
     if display_mode == "Saved research results":
         from .data_access import saved_result_table
         st.info("Saved research results: committed source-bound aggregate presentations; no evaluation is executed.")
@@ -800,7 +798,7 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
                 if value is not None:
                     chart_rows.append({"Configuration": CFG_LABELS.get(cfg,cfg), "Metric": metric.upper(), "Value": value})
         if chart_rows:
-            fig = px.bar(pd.DataFrame(chart_rows), x="Metric", y="Value", color="Configuration", barmode="group", range_y=[0,1], template="plotly_dark")
+            fig = px.bar(pd.DataFrame(chart_rows), x="Metric", y="Value", color="Configuration", barmode="group", range_y=[0,1], template="plotly_white")
             fig.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10,r=10,t=25,b=10))
             st.plotly_chart(fig, use_container_width=True)
         panel_title("Manipulation-stratified metrics", "The evaluator compares each fake type against all real clips in the same split.")
@@ -832,13 +830,13 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
     st.info("No evaluation available: select a structured metrics.json or choose Saved research results.")
 
 
-def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
+def render_benchmarks(root: Path, files: dict[str, list[Path]], *, imported_only=False) -> None:
     st.session_state["artifact_import_failed"] = False
     page_header("RUNTIME / MEMBER 3", "Benchmark explorer",
                 "Read the Member 3 benchmark records without conflating operator, cached-feature model, or preprocessing costs.")
     st.markdown("<div class='avf-warn'><b>Precision disclosure:</b> all non-reference configurations are simulated fake quantization in floating-point arithmetic. The runtime records do not measure a real INT8 kernel or prove INT8 hardware speedup.</div>", unsafe_allow_html=True)
 
-    display_mode = st.radio("Benchmark source", ["Saved CPU research results", "Imported benchmark records"])
+    display_mode = "Imported benchmark records" if imported_only else st.radio("Benchmark source", ["Saved CPU research results", "Imported benchmark records"])
     if display_mode == "Saved CPU research results":
         from .data_access import saved_result_table
         st.info("Saved CPU evidence: cached_feature_model scope; three workloads × four modes. Not raw-video end-to-end latency or native INT8 acceleration. Peak CPU memory was not measured.")
@@ -1130,3 +1128,193 @@ artifacts/runs/<run_id>/*""", language="text")
     st.subheader("Files deliberately not accepted as experiment inputs")
     st.markdown("- Raw video/audio files: no upload-to-inference route exists in the checked-in backend.\n- Arbitrary PyTorch checkpoints: the dashboard does not load or execute user-supplied model weights.\n- Test labels or labels embedded in prediction rows: prediction contract explicitly excludes ground truth.\n- Synthetic smoke scores: never treated as accuracy, AUROC, or research evidence.\n- Uploaded `.pt` / `.npz` feature files: metadata inspection only; no inference, conversion or persistent copy is performed.")
     st.info(f"Repository root detected: `{root}`. Set `AVFUSE_REPO_ROOT` before launch if the code is stored elsewhere; the sidebar does not edit server paths.")
+
+
+# DeepTrace primary workflow. Existing artifact explorers remain available in details.
+MODE_HELP = {
+    "reference": "FP32 reference preserves the original model forward.",
+    "low_precision": "Simulated INT8 rounds Q, K, V and attention output in floating point.",
+    "restore_value_output": "Value/output restoration preserves V and attention output at FP32.",
+    "restore_query": "Query restoration control preserves Q at FP32.",
+}
+
+
+def _use_registered_manifest():
+    value = st.session_state["registered_manifest"]
+    if value != "Enter a path":
+        st.session_state["draft_manifest"] = value
+        st.session_state.setdefault("experiment_draft", {})["manifest"] = value
+
+
+def _open_generated_results():
+    last = st.session_state.get("last_run_result", {})
+    if last.get("run_dir"):
+        st.session_state["selected_run"] = last["run_dir"]
+        st.session_state["result_source"] = "New validation run"
+    _open_results()
+
+
+def _open_saved_results():
+    st.session_state["result_source"] = "Saved evidence"
+    _open_results()
+
+
+def _open_results():
+    st.session_state["workbench_page"] = "Results"
+
+
+def _draft_widget(kind, label, name, default, **kwargs):
+    # Durable non-widget state survives Streamlit's cleanup of hidden page widgets.
+    draft = st.session_state.setdefault("experiment_draft", {})
+    key = "draft_" + name
+    if key not in st.session_state:
+        st.session_state[key] = draft.get(name, default)
+    value = getattr(st, kind)(label, key=key, **kwargs)
+    draft[name] = value
+    return value
+
+
+def _journey(stage=1):
+    steps = ["1. Configure Experiment", "2. Run Experiment", "3. View Results"]
+    st.markdown('<div class="journey">' + ' &nbsp; → &nbsp; '.join(
+        f"<b>{s}</b>" if i == stage else s for i, s in enumerate(steps, 1)) + '</div>', unsafe_allow_html=True)
+
+
+def render_experiment(root: Path, files: dict[str, list[Path]]) -> None:
+    journey = st.empty()
+    left, right = st.columns([1.55, 1], gap="large")
+    with left, st.container(border=True):
+        st.subheader("Experiment setup")
+        source = _draft_widget("radio", "Experiment source", "source", "Explore accepted research results",
+            options=["Explore accepted research results", "Run new validation experiment"])
+        saved = source == "Explore accepted research results"
+        st.caption("Saved evidence · historical study; no inference is executed." if saved else
+                   "New validation run · authorized local cached features required.")
+        st.write("**Precision configurations**")
+        modes = _draft_widget("multiselect", "Configurations", "modes", list(CONFIGS), options=list(CONFIGS),
+                             format_func=lambda x: CFG_LABELS[x])
+        for mode in modes:
+            st.caption(MODE_HELP[mode])
+        if saved:
+            st.info("Explore the accepted LAV-DF study, its source-bound metrics and recorded CPU costs.")
+            st.button("View accepted results", type="primary", on_click=_open_saved_results)
+        else:
+            st.write("**Dataset: LAV-DF · validation only**")
+            st.caption("Assets required. No raw media upload or held-out test execution.")
+            with st.expander("Execution settings"):
+                from .workbench_service import available_validation_manifests
+                manifests = available_validation_manifests(root, files.get("manifests", []))
+                if manifests:
+                    st.selectbox("Available validation manifests", ["Enter a path", *[str(p) for p in manifests]],
+                        format_func=lambda x: str(Path(x).relative_to(root)) if x != "Enter a path" else x,
+                        key="registered_manifest", on_change=_use_registered_manifest)
+                else:
+                    st.caption("No schema-valid LAV-DF validation manifests discovered. Supply an authorized manifest path below.")
+                _draft_widget("text_input", "External DiMoDif checkout", "upstream_root", "")
+                _draft_widget("text_input", "Validation manifest", "manifest", "")
+                _draft_widget("text_input", "Feature root", "feature_root", "")
+                _draft_widget("selectbox", "Feature format", "feature_format", "dimodif_npz", options=["dimodif_npz", "shared_pt"])
+                _draft_widget("selectbox", "Device", "device", "cpu", options=["cpu", "cuda", "cuda:0", "mps"])
+                _draft_widget("text_input", "Run ID", "run_id", "")
+                _draft_widget("text_input", "Experiment ID (optional)", "experiment_id", "")
+                st.caption("The frozen LAV-DF checkpoint SHA-256 is required and enforced by the backend.")
+            from .workbench_service import validate_experiment_readiness, execute_validation_experiment, readiness_is_current
+            draft = st.session_state["experiment_draft"]
+            request = {k: draft.get(k, "") for k in ("upstream_root", "manifest", "feature_root", "feature_format", "device", "run_id", "experiment_id")}
+            request.update(checkpoint_name="lavdf", require_lavdf_hash=True, modes=modes)
+            if st.session_state.get("authorization_request") != request:
+                st.session_state["authorization_request"] = request
+                st.session_state.pop("readiness", None)
+                st.session_state["draft_authorized"] = False
+                draft["authorized"] = False
+            prior_readiness = st.session_state.get("readiness")
+            if prior_readiness and prior_readiness.code == 0 and not readiness_is_current(prior_readiness):
+                st.session_state["draft_authorized"] = False
+                draft["authorized"] = False
+            authorized = _draft_widget("checkbox", "I authorize validation inference with these trusted local assets.", "authorized", False)
+            smoke = _draft_widget("checkbox", "Test one real validation sample during readiness", "smoke", False,
+                help="Loads the licensed model through the existing CLI. Temporary scores are discarded; this is not a completed experiment.")
+            if st.button("Check Readiness", disabled=bool(smoke and not authorized)):
+                with st.spinner("Checking assets and software configuration…"):
+                    st.session_state["readiness"] = validate_experiment_readiness(root, smoke=smoke, **request)
+            readiness = st.session_state.get("readiness")
+            ready = bool(readiness and readiness.code == 0 and readiness_is_current(readiness))
+            if readiness:
+                if readiness.code:
+                    st.error(readiness.diagnostics)
+                elif not ready:
+                    st.warning("Assets changed since readiness. Check again before execution.")
+                else:
+                    st.success(readiness.diagnostics)
+                with st.expander("Asset readiness details"):
+                    st.json({k: readiness.payload.get(k) for k in ("phase", "status", "cli_launched", "asset_counts", "missing_assets", "sample_inspected", "smoke_passed")})
+            else:
+                st.caption("Not configured · Check Readiness identifies missing assets before any experiment starts.")
+            if st.button("Run Experiment", disabled=not (ready and authorized), type="primary"):
+                with st.spinner("Executing the validation cohort and cached-feature benchmark…"):
+                    outcome = execute_validation_experiment(root, **request)
+                st.session_state["last_run_result"] = {"exit_code": outcome.code, **outcome.payload}
+                st.session_state["last_execution_request"] = request
+                st.session_state["run_diagnostics"] = outcome.diagnostics
+                st.session_state.pop("readiness", None)
+                if outcome.payload.get("run_dir"):
+                    st.session_state["selected_run"] = outcome.payload["run_dir"]
+                    st.session_state["result_source"] = "New validation run"
+                files.update(__import__("avfuse_ui.data_access", fromlist=["discover_files"]).discover_files(root))
+                st.rerun()
+            last = st.session_state.get("last_run_result")
+            if last:
+                st.caption(f"Most recent submission · run {last.get('run_id', 'not started')}")
+                if last.get("status") == "complete" and last.get("exit_code") == 0:
+                    st.success("Inference completed. Label-grounded evaluation has not been performed.")
+                elif last.get("phase") == "preflight":
+                    st.error("Readiness check failed. No experiment CLI was launched.")
+                else:
+                    st.warning(f"Execution status: {last.get('status', 'unknown')} · exit {last.get('exit_code')}. Inspect the available run artifacts.")
+                with st.expander("Execution details"):
+                    st.json(last)
+                    st.code(st.session_state.get("run_diagnostics", ""), language="text")
+                st.button("Open generated results", on_click=_open_generated_results,
+                          disabled=not bool(last.get("run_dir") and Path(last["run_dir"]).is_dir()))
+    with right, st.container(border=True):
+        st.subheader("Results preview")
+        st.write("One performance table, one manipulation chart and one cost comparison.")
+        st.caption("All source-bound, with optional technical details and explicit missing-data states.")
+        st.write("**Accepted findings**")
+        st.write("Overall degradation from simulated low precision and a V/output restoration advantage were not statistically established.")
+        st.caption("Confidence intervals crossing zero do not establish equivalence.")
+        st.button("Investigate results →", on_click=_open_results)
+
+    stage = 1
+    if not saved:
+        readiness = st.session_state.get("readiness")
+        if readiness and readiness.code == 0 and readiness_is_current(readiness):
+            stage = 2
+        last = st.session_state.get("last_run_result", {})
+        if (last.get("exit_code") == 0 and last.get("status") == "complete"
+                and st.session_state.get("last_execution_request") == request):
+            stage = 3
+    with journey:
+        _journey(stage)
+
+
+def render_results(root: Path, files: dict[str, list[Path]]) -> None:
+    from .workbench_results import render
+    render(root, files)
+
+
+def render_about(root: Path, files: dict[str, list[Path]]) -> None:
+    st.subheader("About DeepTrace")
+    st.write("Audio and video can each carry manipulation cues. DeepTrace investigates how numerical precision in fusion attention affects a pretrained detector's decisions, and whether selectively preserving precision recovers performance.")
+    st.write("Cached audio/video features → pretrained DiMoDif → attention precision intervention → fake scores → separate evaluation and benchmarking.")
+    st.caption("The audited model uses joint-sequence audio-visual self-attention across five layers.")
+    for mode in CONFIGS:
+        st.write(f"**{CFG_LABELS[mode]}** — {MODE_HELP[mode]}")
+    st.write("The engineering contribution includes model instrumentation, dense/SDPA correctness verification, controlled precision interventions, source-aware evaluation, hardware measurement and reproducible artifacts.")
+    st.warning("Cached-feature input only; no arbitrary raw video upload. Simulated INT8 is floating-point fake quantization, not integer-kernel deployment. New inference requires external licensed assets and is validation-only. Overall precision damage and V/output superiority were not statistically established; these negative/inconclusive results do not prove equality or universal robustness.")
+    st.caption("Source groups do not establish speaker independence. Checkpoint-selection bias and historical test-summary exposure limit interpretation. No universal deepfake-detection or deployment claim follows.")
+    st.markdown("[Methodology and research documentation](https://github.com/SudarshanG9/AFML-project/tree/main/docs)")
+    with st.expander("Artifact formats and local privacy"):
+        render_import_help(root)
+    with st.expander("Original attention and masking diagnostics"):
+        render_diagnostics(root, files)
