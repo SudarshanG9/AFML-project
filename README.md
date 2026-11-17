@@ -74,6 +74,54 @@ Our intended contribution was a **falsifiable, reproducible answer**, even if th
 
 The UI now has just **Experiment**, **Results**, and **About**. From **Experiment**, a user chooses one of two explicitly different paths: **Explore accepted research results** (requires no external assets) or **Run new validation experiment** (requires authorized model/checkpoint/feature assets).
 
+#### Run DeepTrace locally — quick start (before choosing a path)
+
+**Prerequisites:** Git, internet access to download Python packages, and **Python 3.10 or 3.12** (the versions exercised by project CI). The main interface and saved research evidence run locally without downloading LAV-DF media, pretrained model weights or a GPU. Full new inference has separate licensed asset requirements.
+
+1. **Clone the project** from the merged `main` branch:
+
+   ```bash
+   git clone https://github.com/SudarshanG9/AFML-project.git
+   cd AFML-project
+   ```
+
+2. **Create and activate a virtual environment**:
+
+   **macOS / Linux:**
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+   **Windows PowerShell:**
+   ```powershell
+   py -3.12 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   ```
+
+3. **Install the packaged workbench dependencies** from the repository root. This command installs the original backend dependencies (PyTorch, NumPy, scikit-learn, JSON Schema) together with Streamlit, Plotly, Pandas and Matplotlib:
+
+   ```bash
+   python -m pip install --upgrade pip
+   python -m pip install -e ".[workbench]"
+   python -m pip check
+   ```
+
+   For contributors running tests or linters, use `python -m pip install -e ".[workbench,dev]"` instead. The older `frontend/requirements.txt` remains available for compatibility; **you do not need to install it in addition to the workbench extra**.
+
+4. **Launch the application** from `frontend/` so that its light theme and local-server settings load:
+
+   ```bash
+   cd frontend
+   python -m streamlit run app.py --server.address 127.0.0.1
+   ```
+
+5. **Open the local URL** (usually `http://localhost:8501`). Start with **Experiment → Explore accepted research results → View accepted results**; examine Results and About. This is a complete **saved-evidence demonstration**, not a fresh model execution.
+
+6. **For real new precision experiments only**, obtain a trusted external DiMoDif checkout, frozen LAV-DF checkpoint/configuration and compatible labeled validation manifest + complete feature cache, then authorize their paths and follow **Path B** below. These restricted/licensed assets **are not bundled with pip**; their setup is documented in [Section 10](#10-using-deeptrace-and-reproducing-the-evidence).
+
+For platform-specific setup and verification commands, see [Section 10](#10-using-deeptrace-and-reproducing-the-evidence). If PyTorch installation fails on your operating system, use the [official PyTorch installer selector](https://pytorch.org/get-started/locally/) and rerun the package installation. CPU execution is sufficient to explore saved results; device-specific acceleration depends on the installed PyTorch build.
+
 ```mermaid
 flowchart TD
     A["Open DeepTrace → Experiment"] --> B{"Experiment source"}
@@ -232,8 +280,6 @@ The four modes act at the **original joint-sequence audiovisual self-attention l
 7. **Create predictions.** The original feature-pyramid detector produces fake scores. Each prediction records `run_id`, `clip_id`, `split`, `config`, `score_fake` and `checkpoint_sha256`, **without labels**.
 8. **Evaluate only when separately authorized.** Member 2 joins compatible predictions and true labels using a matching frozen protocol, calculates forensic metrics and source-grouped uncertainty, and writes a separate evaluation report; inference alone is not AUROC.
 9. **Present auditable evidence.** Member 3 preserves run/benchmark/provenance metadata; DeepTrace strictly separates accepted study aggregates, identity-matched new validation outputs and independently imported reports. Hash verification and completion remain distinct.
-
-### 4.3 Inside one joint-attention layer
 
 ### 4.3 Inside one joint-attention layer
 
@@ -489,54 +535,160 @@ In the **typical** recorded workload, fake low precision was *slower*, not faste
 
 The study did not solve audiovisual deepfake detection universally; it answered a narrower question about the precision behavior of one detector under one controlled protocol. [Detailed conclusion and future work](docs/08_FINAL_CONCLUSIONS_AND_FUTURE_WORK.md).
 
-## 10. Using DeepTrace and reproducing the evidence
+### 10.1 Prerequisites and packaged dependencies
 
-### 10.1 Install DeepTrace from main
+The merged `main` branch contains the three-section DeepTrace workbench. For the standard saved-results experience, you need **Git**, **Python 3.10 or 3.12** (CI-tested versions), network access for installation, and enough free storage for the PyTorch wheel. **You do not need a GPU, private datasets, a pretrained checkpoint, FFmpeg or the heavy raw-video extraction environment** just to open the dashboard and investigate saved evidence.
+
+All Python dependencies needed for the local workbench are now declared as one installable optional extra in `pyproject.toml`:
+
+| Installed by `.[workbench]` | Purpose |
+| --- | --- |
+| `torch`, `numpy`, `scikit-learn`, `jsonschema` | Existing research backend, cached-feature and validation contracts |
+| `streamlit` | Local interactive workbench |
+| `plotly`, `pandas` | Tables, score/cost comparisons and charts |
+| `matplotlib` | Figures generated by the existing optional Member 2 evaluator |
+| `pytest`, `ruff` | **Optional:** added only with `.[workbench,dev]` for testing and linting |
+
+These are package *version ranges*, not a frozen per-platform lockfile. The selected PyTorch build (CPU, CUDA or macOS/MPS) is platform-specific; for GPU-specific installation follow [PyTorch's official instructions](https://pytorch.org/get-started/locally/). The CI workflow explicitly checks CPU-only PyTorch and the bundled `workbench,dev` extras on Python 3.10 and 3.12. Licensed model code/checkpoints and dataset feature caches are **separate inputs**, not pip dependencies.
+
+### 10.2 Clone, install and launch — macOS / Linux
+
+**Step 1 — Download the current code.**
 
 ```bash
 git clone https://github.com/SudarshanG9/AFML-project.git
 cd AFML-project
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '.[dev]'
-python -m pip install -r frontend/requirements.txt
 ```
 
-A normal clone of `main` includes the three-section DeepTrace workbench. Saved accepted findings and public software checks need no private model assets.
+**Step 2 — Make an isolated Python environment.**
 
-### 10.2 Launch the minimal Streamlit interface
+```bash
+python3 --version
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Use Python 3.10 or 3.12 for a CI-tested setup. On systems with multiple Python versions, invoke the desired version explicitly.
+
+**Step 3 — Install the complete local workbench in one command.**
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -e ".[workbench]"
+python -m pip check
+```
+
+To run the automated checks as a contributor instead, install `python -m pip install -e ".[workbench,dev]"`. Do not run both that command and `pip install -r frontend/requirements.txt`; the extra already includes the frontend packages.
+
+**Step 4 — Run the app with its repository-provided light theme.**
 
 ```bash
 cd frontend
-PYTHONPATH=../src:. python -m streamlit run app.py --server.address 127.0.0.1
+python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
-Open the local Streamlit URL (usually `http://localhost:8501`). In **Experiment**, choose **Explore accepted research results** and **View accepted results**. The **Results** page provides source-bound accepted test/validation aggregate metrics and recorded CPU timing; **About** explains the research and engineering. Simply launching DeepTrace does not run the model or recompute historical results.
+**Step 5 — Open `http://localhost:8501`** (or the address shown by Streamlit), then choose **Experiment → Explore accepted research results → View accepted results**. Read the source-bound metrics and CPU timing on **Results**, and the methodology/limitations on **About**. To stop the server use `Ctrl+C`. A local browser visit never loads model weights or repeats held-out inference.
 
-### 10.3 New validation-only experiments (optional)
+### 10.3 Clone, install and launch — Windows PowerShell
 
-Only users with a trusted external DiMoDif source, frozen LAV-DF checkpoint/config, schema-valid labeled validation manifest, complete compatible cached features, authorized directories and explicit device may run pretrained inference.
+**Step 1 — Install Git and Python 3.12 (or 3.10), then clone.**
 
-1. On **Experiment**, choose **Run new validation experiment**. Open **Execution settings** and enter the trusted assets, mode selection, device and a unique run ID.
-2. Select **Check Readiness**. The UI validates all cache paths/counts, model checkpoint SHA-256, manifest and device, loads one bounded sample through the real feature loader and calls Member 3's `validate-config`. An optional, separately authorized `predict --max-clips 1` checks a real model forward and discards temporary scores.
-3. **Run Experiment** only with current readiness and explicit authorization. The existing Member 3 backend performs validation-only cached-feature inference; failed preflight never consumes a run ID.
-4. Open **Results → New validation run**. Review authentic same-run scores, scoped benchmarks and provenance. Missing ground-truth evaluation remains clearly labeled.
-5. For **label-grounded validation evaluation**, supply a pre-existing frozen protocol exactly matching the manifest, checkpoint and fixed threshold, and request the existing Member 2 evaluator. A report is linked only after matching report/receipt hashes. Inspect/download artifacts and perform explicit run-integrity verification separately.
+```powershell
+git clone https://github.com/SudarshanG9/AFML-project.git
+cd AFML-project
+```
 
-The required LAV-DF checkpoint SHA-256 is `e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e`. External paths must be operator-authorized with `AVFUSE_ASSET_ROOTS`. DiMoDif NPZ caches use `<feature_root>/val/<clip_id>/features.npz` with `video_features` and `audio_features`. The historical `third_party/dimodif` gitlink does not install the external model. See the [reproduction guide](docs/09_REPRODUCIBILITY_AND_USER_GUIDE.md). No arbitrary raw-video upload, test-set unseal, native INT8 inference or recalibration is offered.
+**Step 2 — Create and activate your virtual environment.**
 
-### 10.4 Checks and limitations
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+If your organization blocks activation scripts, use `.venv\Scripts\python.exe` in place of `python` for the following commands, rather than weakening your system-wide PowerShell policy.
+
+**Step 3 — Install and verify dependencies.**
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -e ".[workbench]"
+python -m pip check
+```
+
+**Step 4 — Launch and open the same three-page interface.**
+
+```powershell
+cd frontend
+python -m streamlit run app.py --server.address 127.0.0.1
+```
+
+Open the URL printed by Streamlit. The saved study works without licensed model/data assets. On Windows, directories in `AVFUSE_ASSET_ROOTS` are separated by a semicolon rather than a colon.
+
+### 10.4 The user flow after launch
+
+| Goal | What the user does | Requires external assets? |
+| --- | --- | --- |
+| Investigate completed research | **Experiment → Explore accepted research results → View accepted results** | No |
+| Compare real recorded metrics and costs | **Results → Saved evidence**, then select the accepted aggregate split/workload | No |
+| Understand the engineering/research | **About** and its optional attention diagnostics | No |
+| Execute a new precision experiment | **Experiment → Run new validation experiment → Execution settings → Check Readiness → Run Experiment** | **Yes: compatible authorized DiMoDif and validation cached features** |
+| View a new run | **Results → New validation run**, select the run and inspect predictions/benchmarks | Only an existing genuine run |
+| Evaluate new run correctness | **Results → Label-grounded validation evaluation**, supply exact existing frozen protocol | Yes: matching labels, complete run and protocol |
+| Verify/export | Expand technical details; explicitly verify integrity and download available files | Only matching local artifacts |
+
+### 10.5 Optional: execute new validation-only inference
+
+The local interface is a *research workbench*, not an arbitrary upload-any-video detector. Full inference additionally requires:
+
+1. **Trusted external DiMoDif source** at the documented revision, including its upstream runtime dependencies.
+2. **Frozen supported LAV-DF pretrained checkpoint** (and adjacent JSON config) with expected SHA-256: `e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e`.
+3. **Schema-valid, labeled validation-only LAV-DF manifest** and **complete compatible cached audio/video features**.
+4. **Server-authorized asset directories**, explicit supported device, all intended precision modes, and a unique run ID.
+5. For optional label-grounded metrics, an **existing frozen validation protocol** matching the unchanged manifest/checkpoint and threshold.
+
+The historical `third_party/dimodif` gitlink lacks a working automatic submodule installation, so a recursive clone does **not** automatically provide the pretrained detector. The pinned source checkout, model weights, media licensing, encoder/preprocessing environment and cache extraction procedure are documented in the [reproducibility and user guide](docs/09_REPRODUCIBILITY_AND_USER_GUIDE.md). Obtain them under their licensing and access rules; **do not commit model weights, private feature tensors or restricted datasets to this repository**.
+
+For authorized local directories, set `AVFUSE_ASSET_ROOTS` **before** starting Streamlit (see the [frontend guide](frontend/README.md)); on macOS/Linux use the OS path separator `:` and on Windows use `;`.
+
+On **Experiment**, select **Run new validation experiment**, configure exact paths and modes, click **Check Readiness**, authorize use of these assets, then **Run Experiment**. Readiness checks missing files and a bounded feature-loader sample, not the entire forward computation; an optional genuine one-sample compatibility check is available. The resulting **Results → New validation run** shows predictions/cost and distinguishes inference completion, evaluation status and explicit integrity verification. The existing Member 2 evaluator only runs if a matching frozen validation protocol is provided and the user requests it; incomplete or incompatible inputs are never silently accepted.
+
+No raw uploaded MP4-to-inference path, native INT8 integer execution, test-set unsealing or new threshold calibration is provided.
+
+### 10.6 Verify installation and troubleshoot
+
+From the repository root, with the virtual environment activated:
 
 ```bash
-# From repository root
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:frontend python -m pytest -q tests frontend/tests
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:frontend python -m ruff check --select F frontend
-PYTHONPATH=src python -m avfuse.member3_runtime.cli --help
-PYTHONPATH=src python -m avfuse.member3_runtime.cli --smoke
+python -m pip check
+python -c "import torch, streamlit, plotly, pandas, matplotlib, sklearn, jsonschema; print('All workbench dependencies import successfully')"
+python -m avfuse.member3_runtime.cli --help
+python -m avfuse.member3_runtime.cli --smoke
 ```
 
-The [workbench integration record](frontend/INTEGRATION.md) reports **1,235 passed / 22 skipped** local tests, browser layout/navigation checks and a successful Member 2 evaluator invocation on **synthetic labeled fixtures**. This is not proof of a new licensed DiMoDif experiment. The original [Phase 5 CI report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) covers the earlier integration baseline; the workbench's local test record is documented separately. A full new real-checkpoint UI run is not claimed.
+The `--smoke` command is a **toy diagnostic**, not a real pretrained deepfake result. To run source/UI tests, install the development extra and execute:
+
+```bash
+python -m pip install -e ".[workbench,dev]"
+python -m pytest -q tests
+# From the repository root on macOS/Linux:
+PYTHONPATH=src:frontend python -m pytest -q frontend/tests
+python -m ruff check --select F frontend
+```
+
+On Windows, run the frontend tests using `$env:PYTHONPATH = "src;frontend"` followed by `python -m pytest -q frontend/tests`, from the repository root.
+
+Common issues:
+
+- **`python` or `git` not found:** install Python 3.10/3.12 or Git, then reopen the terminal.
+- **`streamlit`/`plotly`/`matplotlib` missing:** verify the activated venv and rerun `python -m pip install -e ".[workbench]"` from the project root.
+- **PyTorch wheel incompatible or device unavailable:** use the correct build from the [PyTorch installation selector](https://pytorch.org/get-started/locally/), or choose CPU for supported execution. There is no silent device fallback.
+- **Port already in use:** use a different local port via `--server.port 8502`.
+- **Missing manifest/checkpoint/feature cache:** saved evidence still works; a new model run requires independently supplied and authorized assets.
+- **Successful readiness but model run fails:** readiness checks one bounded cache and existing configuration; it is not a full-cohort guarantee.
+- **No metrics after inference:** label-grounded evaluation is a separate explicitly requested action requiring a matching frozen protocol and actual labels.
+
+**Verification boundary:** The [workbench integration record](frontend/INTEGRATION.md) reports **1,235 passed / 22 skipped** in its recorded local suite and a synthetic-fixture evaluator integration test, not a completed new licensed-checkpoint run. The [original Phase 5 CI report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) covers the earlier baseline; updated CI must be checked separately for the bundled dependency installation.
+
 
 ## 11. Limitations and future directions
 
