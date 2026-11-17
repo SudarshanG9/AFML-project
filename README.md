@@ -4,11 +4,11 @@
 
 **A controlled experimental study of how simulated low-precision attention affects the forensic decisions of a frozen, pretrained audiovisual deepfake detector—and whether selectively preserving precision improves those decisions at a measured computational cost.**
 
-AVFuse-CausalQ combines a real pretrained **DiMoDif** detector, **LAV-DF** whole-video data, four precisely defined attention modes, source-aware evaluation, CPU benchmarking, reproducible artifacts, and an eight-page **Streamlit research dashboard**. The accepted scientific study is complete; this repository also documents its negative findings and limitations rather than presenting the hoped-for optimization as a success.
+AVFuse-CausalQ combines a real pretrained **DiMoDif** detector, **LAV-DF** whole-video data, four precisely defined attention modes, source-aware evaluation, CPU benchmarking, reproducible artifacts, and a three-section **DeepTrace Precision Experimentation Workbench (Experiment · Results · About)**. The accepted scientific study is complete; this repository also documents its negative findings and limitations rather than presenting the hoped-for optimization as a success.
 
 > **Main finding:** On the selected LAV-DF cohort, simulated INT8-style rounding of joint-attention activations caused small numerical changes, but **overall precision-induced degradation was not statistically established**. Restoring precision in **V and the attention output** was **not shown to outperform restoring Q**. The measured costs are for floating-point fake quantization on cached features, **not native INT8 acceleration**.
 
-**Project status (November 2026):** Three-member backend, frontend, accepted research evidence, and CI are integrated on [`main`](https://github.com/SudarshanG9/AFML-project). Software tests pass; a complete manual browser walkthrough and an independently demonstrated real-checkpoint run through the Streamlit form remain disclosed validation limitations. See the [Phase 5 readiness report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md).
+**Project status (November 2026):** The accepted scientific backend and redesigned **[DeepTrace Precision Experimentation Workbench](https://github.com/SudarshanG9/AFML-project/tree/main/frontend)** are integrated on [`main`](https://github.com/SudarshanG9/AFML-project/tree/main). The [workbench integration record](frontend/INTEGRATION.md) reports 1,235 local test passes / 22 skips and local UI checks; full licensed-checkpoint validation inference through the redesigned interface has **not** been demonstrated.
 
 ### Contents
 
@@ -68,50 +68,53 @@ Our intended contribution was a **falsifiable, reproducible answer**, even if th
 - Measured operator and model costs with explicit boundaries and hardware details.
 - Reusable code, experiment/provenance records, a CLI, and an interactive research dashboard.
 
-### 2.1 How a user experiences the end system
+### 2.1 DeepTrace user flow — from research dashboard to experimentation workbench
 
-**Think of AVFuse-CausalQ as a research laboratory you can inspect, rather than a website where you upload any video and instantly get a fake/real verdict.** The end system has two distinct uses: (A) explore the **already completed, accepted experiment**, which needs no private checkpoint or dataset; and (B) run a **new, explicitly authorized validation-only experiment** through the real pretrained backend, which requires compatible external assets. The dashboard clearly separates those two sources of evidence.
+**DeepTrace is a precision experimentation workbench, not a generic video-upload deepfake detector.** Its goal is to let researchers interact with the four controlled attention-precision configurations, execute permitted cached-feature experiments, inspect authentic forensic and runtime evidence, and understand what the accepted study actually supports.
+
+The UI now has just **Experiment**, **Results**, and **About**. From **Experiment**, a user chooses one of two explicitly different paths: **Explore accepted research results** (requires no external assets) or **Run new validation experiment** (requires authorized model/checkpoint/feature assets).
 
 ```mermaid
 flowchart TD
-    U[User opens the Streamlit research dashboard] --> C{What would you like to do?}
-    C -->|Understand the completed study| A[Read Overview and inspect the dataset and fusion diagnostics]
-    A --> E[Open Evaluation: accepted metrics and paired confidence intervals]
-    E --> B[Open Benchmarks: saved CPU timing measurements]
-    B --> F[Interpret hypotheses, findings and limitations]
-    C -->|Run a permitted new validation experiment| V[Supply authorized DiMoDif checkout, checkpoint, manifest and cached AV features]
-    V --> Q[Confirm inputs and choose precision modes]
-    Q --> R[Streamlit calls the actual Member 3 validation and run CLI]
-    R --> M[Member 1 loads frozen DiMoDif and computes fake probabilities]
-    M --> P[Member 3 saves predictions, benchmarks and provenance]
-    P --> I[Inspect outputs and explicitly verify run integrity]
-    I --> G[Use Member 2 evaluation separately if an authorized report is needed]
+    A["Open DeepTrace → Experiment"] --> B{"Experiment source"}
+    B -->|"Saved accepted evidence"| C["Original source-bound LAV-DF aggregate metrics"]
+    C --> D["Results: performance, manipulation recall, recorded CPU cost"]
+    B -->|"New validation experiment"| E["Configure four modes, trusted checkpoint, manifest, feature root, device and run ID"]
+    E --> F["Check Readiness: cache counts, hash/device, one bounded loader sample, validate-config"]
+    F -->|"Invalid / missing"| G["Actionable error; no execution CLI launched or run ID consumed"]
+    F -->|"Ready; optional"| H["One real-sample predict compatibility check"]
+    F -->|"Ready + authorized"| I["Member 3 run --split val"]
+    H --> I
+    I --> J["Member 1 frozen DiMoDif inference → real predictions + benchmark artifacts"]
+    J --> K["Results: selected run, per-clip scores, scoped costs and provenance"]
+    K --> L{"Matching frozen validation protocol available?"}
+    L -->|"Yes, user requests"| M["Member 2 evaluator → hash-bound evaluation report"]
+    L -->|"No"| N["Evaluation remains unavailable"]
+    M --> K
+    D --> O["About: architecture, modes and scientific limitations"]
+    K --> O
 ```
 
-#### Path A — Explore the completed research (recommended first)
+#### Path A — Explore the accepted study
 
-1. **Launch the dashboard.** Follow [Section 10](#10-using-the-system-and-reproducing-the-evidence) or the [frontend launch guide](frontend/README.md). The application opens locally; merely viewing a page **does not load the pretrained model or rerun the held-out test**.
-2. **Start at _Overview_.** Read the objective, implementation status and available research artifacts. A successful software-interface check means the relevant Python code imports; it does **not** mean an external checkpoint was loaded or real inference completed.
-3. **Visit _Dataset & features_.** Learn how whole LAV-DF videos are grouped into real, audio-fake, video-fake and both-fake categories, and why cached audio/video encoder features are used instead of raw media at inference time.
-4. **Open _Fusion diagnostics_.** Inspect saved attention, masking, ablation and memory evidence wherever present. These explain *where* numerical interventions happen; they are not themselves proof of better detection.
-5. **Open _Evaluation_ → _Saved research results_.** Inspect the accepted four-mode AUROC, average precision, BCE, recall, false-positive rate, manipulation-specific results and paired 95% confidence intervals. These are **original saved measurements**, not numbers generated when the page opens. Pay particular attention to the paired BCE comparisons: intervals spanning zero do not establish overall precision damage or a V/output restoration advantage.
-6. **Open _Benchmarks_.** Compare the saved CPU model runtimes across the four modes and three workloads. These measure **cached-feature model calls**, including applicable simulated-quantization work—not the time to decode, preprocess and classify a raw video, or a native INT8 hardware speedup.
-7. **Visit _Runs & system_ and _Artifact import_ if you want to audit more evidence.** You can inspect discovered run folders, explicitly request an integrity check, or select supported local/uploaded artifacts. A file's presence or a previous integrity receipt is not proof of a completed, scientifically accepted experiment.
+1. Open **Experiment**. The default selection, **Explore accepted research results**, never loads the checkpoint or reruns the held-out experiment.
+2. Review/select the supported modes: `reference` (FP32), `low_precision` (simulated INT8), `restore_value_output` (V/output precision retained) and `restore_query` (Q restoration control). Selection filters the display rather than changing historical evidence.
+3. Click **View accepted results** or open **Results → Saved evidence**. Select original **test** or **validation** aggregates. The app reads preserved source-bound CSVs and figures, not a new evaluator output.
+4. Compare available overall AUROC/AUPRC/recall/BCE, manipulation recall with reported intervals and per-workload recorded CPU cached-feature timings. Original research tables and provenance remain accessible in technical details.
+5. Interpret the actual findings: **neither statistically significant overall low-precision damage nor an overall V/output restoration advantage was established**. Aggregate files do not contain sample-level prediction rows, so per-clip score comparison is unavailable on this path. CPU peak memory is unmeasured.
+6. Use **About** for the five-layer joint-sequence attention boundary, four interventions, systems choices and limitations.
 
-**What you should understand by the end of Path A:** what the team hypothesized, what changed mathematically in the frozen detector, how the results were measured, **what the data actually support**, and where the limits of that conclusion lie. No model download or new experiment is needed to read the accepted results.
+#### Path B — Run a new authorized validation experiment
 
-#### Path B — Execute the real backend on authorized validation inputs (optional)
+1. Choose **Run new validation experiment** on **Experiment**. Expand **Execution settings** to select a discovered schema-valid LAV-DF validation manifest or enter an authorized path. Supply the trusted external DiMoDif checkout, frozen LAV-DF checkpoint/config, cached feature root (`dimodif_npz` or `shared_pt`), explicit device, unique run ID and optional experiment ID. All four canonical modes are selected by default. External paths must be authorized by the server through `AVFUSE_ASSET_ROOTS`.
+2. Click **Check Readiness**. The frontend validates manifest, source groups/split, checkpoint hash and config, device and **every required cache path**, reporting expected/found/missing counts and examples. It opens **one bounded representative feature cache** through the existing loader and calls the existing Member 3 `validate-config`. This proves only limited asset/software readiness, **not that every tensor or the full model run will work**. Failed preflight does not consume the run ID; asset changes invalidate the check.
+3. With explicit authorization, optionally enable **Test one real validation sample during readiness**. This calls existing `predict --max-clips 1` and discards temporary predictions. It is a compatibility check, not a completed experiment or research measurement.
+4. Click **Run Experiment** only after current readiness and authorization. The adapter rechecks inputs then invokes existing Member 3 `run --split val --require-lavdf-hash`; Member 1's frozen model runs selected modes. Actual predictions, scoped benchmarks, statuses and provenance are saved. Incomplete/failed runs and timeouts are reported; no test access or device fallback is provided.
+5. Open **Results → New validation run**, choose the run and inspect only identity-matched predictions (run/split/checkpoint), available cost records, missing modes and one-clip score differences from FP32. Decision flips are displayed only if a corresponding documented fixed threshold exists; agreement with FP32 is not ground-truth correctness.
+6. For metrics, expand **Label-grounded validation evaluation** and supply an **existing frozen protocol** matching the *exact unchanged* validation manifest, checkpoint and fixed threshold. The frontend invokes the unchanged Member 2 evaluator only on request, then associates a report only when its provenance/hash receipt matches. Missing labels or incompatible protocols leave metrics **not performed**; inference completion alone is not evaluation completion.
+7. Inspect failures, provenance, optional explicit integrity verification and downloads in technical details. **Results → Imported artifacts** is independent; uploads do not automatically become part of an existing run.
 
-This path is for a developer/researcher who has the **pinned external DiMoDif source and LAV-DF checkpoint**, an appropriate **validation-only manifest**, and the **complete compatible precomputed feature cache**, with permission to use them. The dashboard does **not** accept arbitrary uploaded MP4s for raw-video deepfake inference; its model input consists of encoder-generated audio/video tensors.
-
-1. Open **_Demo & predictions_** and select the approved LAV-DF model, feature format, device and one or more of the four precision modes. Enter a **new run ID**, provide the server-authorized filesystem paths, and explicitly confirm the inputs. The UI checks for validation-only use and enforces the agreed checkpoint identity.
-2. The frontend calls `python -m avfuse.member3_runtime.cli validate-config`, followed—only when validation succeeds—by the actual `run` command. This is a real backend subprocess, **not a mock detector hidden behind the interface**.
-3. **Member 3** loads the approved cached features; **Member 1** constructs the frozen DiMoDif model and runs the selected reference/precision-intervention paths. The runtime writes computed fake-score rows, scoped benchmarks, execution summaries and provenance. Missing inputs, incompatible modes, incomplete runs or failures are reported instead of replaced with fictional predictions.
-4. Return to **_Demo & predictions_** or **_Runs & system_** to inspect discovered outputs. Perform explicit run-integrity verification where appropriate. If you need new **label-grounded evaluation metrics and statistical comparisons**, run the **separate Member 2 evaluator** with the permitted validation evidence and then inspect its report; completing inference alone does not automatically calculate a new AUROC or approve a research result.
-
-**Important boundary:** The dashboard's **synthetic smoke test** checks software wiring only; it must not be presented as a checkpoint-backed prediction. The completed held-out study remains frozen, and no casual dashboard interaction should reopen or retune it. At the documented Phase 5 handoff, the frontend-to-backend integration passed automated tests, but a full live real-model validation run through the UI was **not independently demonstrated** with the complete authorized feature cache.
-
-For full setup instructions, prerequisites and reproducibility limits, read [Section 10](#10-using-the-system-and-reproducing-the-evidence), the [frontend guide](frontend/README.md), and the [Phase 5 readiness report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md).
+**Scope:** no arbitrary MP4/audio input, no native INT8 kernel, no new calibration or held-out test rerun. The [frontend guide](frontend/README.md) documents asset requirements; the [integration record](frontend/INTEGRATION.md) confirms UI/tests and synthetic-fixture evaluation wiring but **not a new full licensed DiMoDif inference run**.
 
 ## 3. Technical choices, models, and datasets
 
@@ -177,62 +180,60 @@ The V and output boundaries are restored **together**, and the same policy is ap
 
 ## 4. System architecture and complete data flow
 
-### 4.1 End-to-end research architecture
+### 4.1 Scientific backend and frontend control layer
 
-The system is **artifact-driven**: an offline preparation pipeline makes compatible features; Member 3 runs Member 1's real model and saves scores; Member 2 performs label-based evaluation separately; Streamlit displays accepted evidence and can request new *validation-only* development runs.
+The scientific pipeline remains unchanged: **Member 2** owns offline feature preparation and label-grounded evaluation, **Member 1** instruments a frozen pretrained DiMoDif detector, and **Member 3** executes cached-feature precision modes and records benchmarks/provenance. **DeepTrace** now coordinates those existing interfaces through a local Streamlit service layer; it introduces no second detector or HTTP server.
 
 ```mermaid
 flowchart TB
-    subgraph OFFLINE["OFFLINE PREPARATION — MEMBER 2"]
-        A["LAV-DF videos and metadata"] --> B["Whole-video manifest and source audit"]
-        A --> C["MediaPipe preprocessing and auto-AVSR encoders"]
-        C --> D["Cached audio/video features — FP32, width 768"]
-        B --> E["Canonical clip IDs, splits and source groups"]
+    subgraph UX["DEEPTRACE FRONTEND"]
+        A["Experiment: saved evidence or authorized validation run"] --> B["Frontend service: readiness, security guards, state, CLI dispatch"]
+        C["Results: saved / selected run / imported"]
+        D["About: architecture, modes, limits"]
     end
-
-    subgraph RUNTIME["CONTROLLED INFERENCE — MEMBERS 3 + 1"]
-        F["Member 3 CLI: validate-config / run / predict"]
-        G["Feature loader: NPZ or compatible PT"]
-        H["Member 1: frozen DiMoDif adapter"]
-        I["Five joint self-attention layers + selected precision mode"]
-        J["Original feature pyramid and detection head"]
-        K["Predictions: run ID / clip ID / split / mode / score / checkpoint hash"]
-        L["Validation CPU timing, run summaries and artifact hashes"]
-        F --> G --> H --> I --> J --> K
-        F --> L
-        I --> L
+    subgraph OFF["MEMBER 2 — OFFLINE"]
+        E["Licensed LAV-DF media + metadata"] --> F["Source-grouped manifest and labels"]
+        E --> G["MediaPipe + auto-AVSR extraction"] --> H["Cached video/audio features"]
     end
-
-    subgraph ANALYSIS["EVIDENCE AND PRESENTATION"]
-        M["Member 2: schema checks and label-based evaluation"]
-        N["Metrics / source-group bootstrap / paired confidence intervals"]
-        O["Accepted saved results + figures"]
-        P["Streamlit: 8-page research dashboard"]
-        K --> M --> N --> O --> P
-        L --> P
-        K --> P
+    subgraph INFER["MEMBERS 3 AND 1 — VALIDATION INFERENCE"]
+        I["Member 3 CLI validate-config / predict / run"] --> J["Existing NPZ/PT loader"]
+        J --> K["Member 1 frozen DiMoDif adapter"]
+        K --> L["Five joint self-attention layers + one of four precision modes"]
+        L --> M["Original feature pyramid and detection head"]
+        M --> N["Six-field prediction JSONL"]
+        I --> O["Scoped benchmark, run summary and provenance"]
     end
-
-    D --> G
-    E --> F
-    E --> M
-    Q["Withheld labels — evaluation only"] --> M
-    P -->|"Explicit, confirmed validation request"| F
+    subgraph EVAL["MEMBER 2 — OPTIONAL EVALUATION"]
+        P["Existing matching frozen protocol + labels"] --> Q["Existing evaluator / source-grouped CIs"]
+        Q --> R["Evaluation report + exact-input receipt"]
+    end
+    B -->|"Explicit authorized val-only command"| I
+    H --> J
+    F --> B
+    F -->|"Ground truth only at evaluation"| P
+    N -->|"Identity-matched complete predictions"| Q
+    N --> C
+    O --> C
+    R --> C
+    S["Preserved accepted CSVs / original CPU timing"] -->|"Read-only"| C
+    T["Independent imported reports"] --> C
 ```
 
-**The diagram shows several cooperating commands, not a single automatic raw-video-to-prediction API.** The offline extractor and statistical evaluator are separate from the UI's live inference command. Labels are joined only for evaluation; they are not features supplied to the detector.
+The four modes act at the **original joint-sequence audiovisual self-attention layers**. The detector receives cached tensors, not raw media, and outputs scores without labels. Ground-truth labels enter only the evaluator. Saved held-out aggregate evidence and new validation runs are completely separate sources.
 
 ### 4.2 What happens at each stage
 
-1. **Select and audit whole videos.** Member 2 derives binary labels and `audio_fake` / `video_fake` / `both_fake` categories, and assigns stable IDs and source groups.
-2. **Extract once, reuse many times.** MediaPipe and the upstream auto-AVSR encoders generate video and audio representations. Keeping the same features across modes prevents repeated decoding from confounding the comparison.
-3. **Load validated cached features.** DiMoDif-compatible NPZ files contain `video_features` and `audio_features` arrays of shape `[T_v,768]` and `[T_a,768]`. The runtime checks finite floating-point values, dimensions, and required keys. It also supports a separately validated `shared_pt` contract.
-4. **Reconstruct the original pretrained detector.** `DiMoDifAdapter` loads the upstream architecture and checkpoint with strict weight matching, calls `eval()`, and freezes parameters. It is **not a mock detector**.
-5. **Prepare joint tokens.** The adapter truncates both feature sequences to the shared valid length, at most 600, pads each modality to 600, projects to 64 dimensions, and adds two special tokens. This yields **1,202 positions**.
-6. **Apply the attention intervention.** Five existing joint self-attention layers use four heads. A typical Q/K/V tensor at the padded boundary has shape **`[1,4,1202,16]`**. The chosen mode rounds selected activations while preserving the original masking, learned weights, and output projection.
-7. **Produce original-model fake scores.** The upstream feature-pyramid/detection head generates a probability per video. Each prediction row records `run_id`, `clip_id`, `split`, `config`, `score_fake`, and `checkpoint_sha256`—**no labels**.
-8. **Evaluate independently.** Member 2 aligns predictions with canonical labels, applies the fixed threshold, computes metrics, and produces paired source-grouped intervals. This does **not** happen automatically every time Streamlit runs inference.
-9. **Preserve and present artifacts.** Member 3 records runtime/provenance/integrity. Streamlit reads those artifacts as well as the **already accepted** aggregate CSVs and figures. The dashboard does not recompute or overwrite held-out results on launch.
+1. **Choose and audit whole videos.** Member 2 produces stable clip IDs, source groups, labels and manipulation types (`audio_fake` / `video_fake` / `both_fake`).
+2. **Extract features once.** MediaPipe and upstream auto-AVSR encoders produce shared FP32 representations, avoiding repeated video decoding during mode comparisons.
+3. **Load compatible caches.** DiMoDif NPZ files contain `video_features` and `audio_features` with shapes [T_v,768] and [T_a,768]; a separately checked `shared_pt` format is supported.
+4. **Load the frozen model.** The Member 1 adapter loads the exact architecture/checkpoint, uses evaluation mode and freezes learned parameters.
+5. **Construct joint tokens.** Truncate both modalities to a common valid length up to 600, pad each to 600, project into 64 dimensions and add two special tokens (1,202 total).
+6. **Apply a precision intervention.** Five four-head joint self-attention blocks (Q/K/V typically `[1,4,1202,16]`) run the chosen rounding/restoration policy while retaining learned weights and original masks.
+7. **Create predictions.** The original feature-pyramid detector produces fake scores. Each prediction records `run_id`, `clip_id`, `split`, `config`, `score_fake` and `checkpoint_sha256`, **without labels**.
+8. **Evaluate only when separately authorized.** Member 2 joins compatible predictions and true labels using a matching frozen protocol, calculates forensic metrics and source-grouped uncertainty, and writes a separate evaluation report; inference alone is not AUROC.
+9. **Present auditable evidence.** Member 3 preserves run/benchmark/provenance metadata; DeepTrace strictly separates accepted study aggregates, identity-matched new validation outputs and independently imported reports. Hash verification and completion remain distinct.
+
+### 4.3 Inside one joint-attention layer
 
 ### 4.3 Inside one joint-attention layer
 
@@ -266,23 +267,31 @@ The intervention's dynamic per-tensor scaling is:
 
 The rounded output is **still a floating-point tensor**. Full technical equations and masking limitations are in [Chapter 4](docs/04_FINAL_SYSTEM_ARCHITECTURE.md).
 
-### 4.4 How the frontend connects to the actual backend
+### 4.4 How the new frontend actually connects to the backend
 
-The eight-page dashboard is implemented in `frontend/app.py` and `frontend/avfuse_ui/`. When a user explicitly requests an authorized validation run, the UI calls `run_cached_feature_experiment()` in `backend_status.py`. That adapter invokes the real Member 3 commands through **Python subprocesses**:
+| Frontend module | Responsibility |
+| --- | --- |
+| `frontend/app.py` and `avfuse_ui/ui.py` | Three main pages, persistent experiment draft, authorization and minimal presentation; original diagnostics remain expandable |
+| `avfuse_ui/workbench_service.py` | Authorized assets/cache counts, checkpoint hash and device, one bounded feature load, readiness freshness, optional genuine one-sample predict, evaluation handoff |
+| `avfuse_ui/backend_status.py` | Structured preflight vs CLI errors, original backend argument-list subprocess execution |
+| `avfuse_ui/workbench_results.py` | Source-bound overall/manipulation/CPU results, selected-run scores and benchmarks, optional real Member 2 evaluation report and export |
+| `avfuse_ui/data_access.py` and `run_inspection.py` | Shared contract readers, saved original evidence, run discovery and explicit dated integrity verification |
 
 ```text
-Streamlit form
-    → validate local/authorized paths and validation-only manifest
-    → python -m avfuse.member3_runtime.cli validate-config ... --json
-    → python -m avfuse.member3_runtime.cli run ... --split val --require-lavdf-hash --json
-    → Member 3 builds Member 1's genuine DiMoDifAdapter
-    → cached-feature predictions and scoped benchmark records
-    → newly discovered artifact files and run-status UI
+Experiment → select source and four precision configurations
+   → (new validation run) enter trusted checkpoint, manifest, features, device
+   → Check Readiness → original Member 3 validate-config
+   → optional predict --max-clips 1 compatibility check
+   → authorize → Member 3 run --split val --require-lavdf-hash
+   → frozen Member 1 model → predictions, benchmark, provenance
+   → Results → same-run score comparison and recorded costs
+   → optional Member 2 evaluate --split val with matching frozen protocol
+   → separate receipt-bound metrics report (only if actually executed)
 ```
 
-There is **no parallel dummy inference implementation** in the production UI. An optional CLI `--smoke` command uses a clearly labeled toy model **only to test infrastructure**, never to supply scientific results. Real inference requires the external checkpoint, matching configuration, authorized validation manifest, and complete compatible cache. The final Phase 5 report does not claim that this last real-asset browser demonstration was performed.
+The bridge is implemented **inside `frontend/`**, not in scientific packages. Missing assets and frontend preflight failures do not masquerade as CLI exits or consume run IDs. Readiness is not full-cohort success; newly generated predictions are not automatically label-grounded evaluation. The Results page separates **Saved evidence**, **New validation run** and **Imported artifacts**.
 
-**Dashboard pages:** Overview · Dataset & features · Fusion diagnostics · Demo & predictions · Evaluation · Benchmarks · Runs & system · Artifact import.
+**Verification:** The [workbench integration report](frontend/INTEGRATION.md) records 1,235 passing local tests and 22 skips, local browser exercises and an evaluator run on labeled synthetic fixtures. **No new complete licensed-checkpoint validation execution through this UI was demonstrated.**
 
 ## 5. Research design and evaluation methodology
 
@@ -340,12 +349,14 @@ AFML-project/
 │   └── shared/                     # Shared precision-mode and JSONL contracts
 │
 ├── frontend/
-│   ├── app.py                       # Eight-page Streamlit application
+│   ├── app.py                       # Three-section DeepTrace Streamlit application
 │   ├── avfuse_ui/
 │   │   ├── backend_status.py        # Real Member 3 CLI subprocess bridge
 │   │   ├── data_access.py           # Real schema and saved-result readers
 │   │   ├── run_inspection.py        # Explicit run integrity verification
-│   │   └── ui.py                    # Page layouts and user interactions
+│   │   ├── workbench_service.py     # Readiness, CLI/evaluator coordination
+│   │   ├── workbench_results.py     # Saved, new-run and imported evidence
+│   │   └── ui.py                    # Three-page user flow + diagnostics
 │   ├── tests/                       # Frontend and integration tests
 │   └── README.md                    # UI setup and artifact handling
 │
@@ -478,9 +489,9 @@ In the **typical** recorded workload, fake low precision was *slower*, not faste
 
 The study did not solve audiovisual deepfake detection universally; it answered a narrower question about the precision behavior of one detector under one controlled protocol. [Detailed conclusion and future work](docs/08_FINAL_CONCLUSIONS_AND_FUTURE_WORK.md).
 
-## 10. Using the system and reproducing the evidence
+## 10. Using DeepTrace and reproducing the evidence
 
-### 10.1 Install from a clean clone
+### 10.1 Install DeepTrace from main
 
 ```bash
 git clone https://github.com/SudarshanG9/AFML-project.git
@@ -492,49 +503,40 @@ python -m pip install -e '.[dev]'
 python -m pip install -r frontend/requirements.txt
 ```
 
-The installed package and frontend allow you to explore source code, run synthetic correctness checks, and view saved results **without obtaining restricted media or checkpoints**. The extraction environment for raw video is a separate, heavier setup.
+A normal clone of `main` includes the three-section DeepTrace workbench. Saved accepted findings and public software checks need no private model assets.
 
-### 10.2 Start the research dashboard
+### 10.2 Launch the minimal Streamlit interface
 
 ```bash
 cd frontend
 PYTHONPATH=../src:. python -m streamlit run app.py --server.address 127.0.0.1
 ```
 
-Visit the local URL printed by Streamlit (normally `http://localhost:8501`). The frontend's eight pages let you inspect original result tables and figures, imported artifacts, software status, validation predictions and run integrity. The application **does not load a pretrained model or rerun the accepted study on launch**.
+Open the local Streamlit URL (usually `http://localhost:8501`). In **Experiment**, choose **Explore accepted research results** and **View accepted results**. The **Results** page provides source-bound accepted test/validation aggregate metrics and recorded CPU timing; **About** explains the research and engineering. Simply launching DeepTrace does not run the model or recompute historical results.
 
-Run the backend smoke check from the repository root:
+### 10.3 New validation-only experiments (optional)
 
-```bash
-python -m avfuse.member3_runtime.cli --help
-python -m avfuse.member3_runtime.cli --smoke
-```
+Only users with a trusted external DiMoDif source, frozen LAV-DF checkpoint/config, schema-valid labeled validation manifest, complete compatible cached features, authorized directories and explicit device may run pretrained inference.
 
-`--smoke` uses a **toy diagnostic path**. Its scores and timings are **not scientific detector results**.
+1. On **Experiment**, choose **Run new validation experiment**. Open **Execution settings** and enter the trusted assets, mode selection, device and a unique run ID.
+2. Select **Check Readiness**. The UI validates all cache paths/counts, model checkpoint SHA-256, manifest and device, loads one bounded sample through the real feature loader and calls Member 3's `validate-config`. An optional, separately authorized `predict --max-clips 1` checks a real model forward and discards temporary scores.
+3. **Run Experiment** only with current readiness and explicit authorization. The existing Member 3 backend performs validation-only cached-feature inference; failed preflight never consumes a run ID.
+4. Open **Results → New validation run**. Review authentic same-run scores, scoped benchmarks and provenance. Missing ground-truth evaluation remains clearly labeled.
+5. For **label-grounded validation evaluation**, supply a pre-existing frozen protocol exactly matching the manifest, checkpoint and fixed threshold, and request the existing Member 2 evaluator. A report is linked only after matching report/receipt hashes. Inspect/download artifacts and perform explicit run-integrity verification separately.
 
-### 10.3 What real validation inference requires
+The required LAV-DF checkpoint SHA-256 is `e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e`. External paths must be operator-authorized with `AVFUSE_ASSET_ROOTS`. DiMoDif NPZ caches use `<feature_root>/val/<clip_id>/features.npz` with `video_features` and `audio_features`. The historical `third_party/dimodif` gitlink does not install the external model. See the [reproduction guide](docs/09_REPRODUCIBILITY_AND_USER_GUIDE.md). No arbitrary raw-video upload, test-set unseal, native INT8 inference or recalibration is offered.
 
-Real model execution requires **all** of the following: (1) trusted external DiMoDif source at the documented revision, (2) matching LAV-DF checkpoint/config, (3) approved validation-only manifest, (4) complete compatible cached features, (5) explicitly chosen device and precision modes, and (6) permission to use the assets.
-
-The historical `third_party/dimodif` gitlink lacks `.gitmodules`; **do not assume `git clone --recursive` installs the detector**. Follow the [reproducibility guide](docs/09_REPRODUCIBILITY_AND_USER_GUIDE.md) for the external source checkout, checkpoint SHA-256 checks, manifest identity and **validation-only** CLI examples. The accepted checkpoint identity is:
-
-`e1e59006d1bb6ad36a3859af5486a6649ed41bba23258b7c41e24f873be7948e`
-
-The intended DiMoDif NPZ cache layout is `feature_root/val/<clip_id>/features.npz`, with `video_features` and `audio_features` keys. Arbitrary video uploads or arbitrary embedding tensors are **not** supported as detector input. The Streamlit form invokes the actual Member 3 backend and enforces validation-only access and the LAV-DF checkpoint hash.
-
-**Verification boundary:** Phase 5 verified interface wiring and synthetic tests, but **did not execute a new real-checkpoint inference through the frontend** with a complete authorized cache. The accepted held-out results come from the preserved original experiment, not a fabricated dashboard run. Never reopen the original test cohort merely to demonstrate UI functionality.
-
-### 10.4 Tests and recorded software status
+### 10.4 Checks and limitations
 
 ```bash
 # From repository root
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:frontend \
-  python -m pytest -q tests frontend/tests
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:frontend python -m pytest -q tests frontend/tests
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:frontend python -m ruff check --select F frontend
+PYTHONPATH=src python -m avfuse.member3_runtime.cli --help
+PYTHONPATH=src python -m avfuse.member3_runtime.cli --smoke
 ```
 
-The [Phase 5 report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) records **1,181 local tests passed, 22 skipped, 0 failures/errors** (19 historical private-fixture-dependent cases and three unavailable ffmpeg/ffprobe cases). The Python **3.10 and 3.12 GitHub CI jobs passed** on the integration commit; the merged `main` workflow also passed. Skipped real-fixture tests are not counted as demonstrated real-model execution.
-
-[CI workflow](.github/workflows/ci.yml) · [Merged `main` workflow run](https://github.com/SudarshanG9/AFML-project/actions/runs/43721523552) · [Frontend setup](frontend/README.md) · [Phase 5 verification](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md).
+The [workbench integration record](frontend/INTEGRATION.md) reports **1,235 passed / 22 skipped** local tests, browser layout/navigation checks and a successful Member 2 evaluator invocation on **synthetic labeled fixtures**. This is not proof of a new licensed DiMoDif experiment. The original [Phase 5 CI report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) covers the earlier integration baseline; the workbench's local test record is documented separately. A full new real-checkpoint UI run is not claimed.
 
 ## 11. Limitations and future directions
 
@@ -548,7 +550,7 @@ The [Phase 5 report](docs/integration/PHASE_5_RELEASE_READINESS_REPORT.md) recor
 - **Statistical interpretation:** Small effects and zero-crossing CIs do not prove equivalence. Eighty nominal paired intervals were not multiplicity-adjusted.
 - **Incomplete independent extraction audit:** Directory/metadata coverage reached 3,200 selected clips; the separately recorded complete-array audit stopped at 2,800 before an interruption. Later accepted inference is not retroactive byte-for-byte extraction verification.
 - **Benchmark scope:** Resident cached-feature CPU timings do not measure end-to-end video preprocessing or prove equal restoration costs, memory savings or native speedup.
-- **Application verification:** Automated tests and CI are green; complete human UI upload/visual checks and live checkpoint-backed Streamlit execution were not claimed in Phase 5.
+- **Application verification:** The redesigned frontend has recorded local tests, browser interaction checks and synthetic-fixture evaluator integration; a full new licensed-checkpoint run, hosted feature-branch CI and complete browser upload/responsive coverage remain unverified.
 
 ### What we hope future work can achieve
 
