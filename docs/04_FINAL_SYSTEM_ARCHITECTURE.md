@@ -32,7 +32,7 @@ flowchart TD
   S --> U
 ```
 
-The diagram describes responsibilities and data flow, not a single monolithic executable. The offline extractor, inference CLI, evaluator and provenance tools have separate commands. Frontend presentation may consume their artifacts in its existing branch; the cleanup adds no frontend implementation or upload-to-raw-inference promise.
+This diagram describes the **unchanged scientific pipeline**, not a raw-media inference API. The new DeepTrace workbench on `feature/deeptrace-precision-workbench` coordinates authorized validation-only inference and optional exact-protocol evaluation without replacing the model or evaluator.
 
 ## Offline features and manifest
 
@@ -94,4 +94,31 @@ The current Member 3 CLI provides `validate-config`, `predict`, `run`, `benchmar
 
 Model timing consumes resident tokens and includes preparation/padding, attention/head and applicable fake-quant conversions. Operator timing excludes projections and the full model. Offline extraction and independent preprocessing measurements remain separate. The accepted measurements do not include a complete raw-media path or measured CPU peak tensor memory.
 
-The frontend/backend boundary consists of existing backend imports, CLI contracts and artifact formats. All remain stable. No rename requiring a frontend edit was performed, and `frontend/**` was untouched. The supported real-model demonstration requires supplied cached features; arbitrary video upload does not become supported inference merely because a dashboard can display a file or saved report.
+Backend APIs, CLI contracts and artifacts remain unchanged. The redesigned frontend adds only orchestration and presentation within `frontend/`. Licensed model source, frozen checkpoint and complete compatible validation caches are still required for a real new inference run; raw-video upload is not supported.
+
+
+## DeepTrace — frontend orchestration and evidence boundaries
+
+The workbench is a **three-page Streamlit control plane**: Experiment, Results, About. It reuses the scientific architecture above.
+
+```mermaid
+flowchart TD
+    A["Experiment → choose saved evidence or validation inference"] --> B["Frontend workbench_service: authorized asset readiness"]
+    B --> C["Member 3 validate-config"]
+    B -->|"Optional real one-sample"| D["Member 3 predict --max-clips 1 (temporary)"]
+    C --> E["Member 3 run --split val"]
+    E --> F["Member 1 frozen four-mode DiMoDif inference"]
+    F --> G["Predictions, benchmark and provenance artifacts"]
+    G --> H["Results → new run; identity-matched inspection"]
+    H -->|"Matching frozen protocol, user request"| I["Member 2 existing validation evaluator"]
+    I --> J["Report and exact-input hash receipt, outside run bundle"]
+    J --> H
+    K["Accepted historical aggregates"] --> L["Results → saved evidence (read only)"]
+    M["Imported independent artifacts"] --> N["Results → imported artifacts"]
+```
+
+The UI-facing modules are `frontend/app.py` and `avfuse_ui/ui.py` (navigation, durable draft and authorization), `workbench_service.py` (missing-cache inventory, checkpoint/device checks, bounded sample load, optional genuine forward and evaluator handoff), `backend_status.py` (structured subprocess invocations), `workbench_results.py` (source-bound presentations and available downloads), plus `data_access.py` and `run_inspection.py` (safe readers, schemas and dated explicit integrity checks). No HTTP server or alternative detector was introduced.
+
+**Separation of evidence:** a valid config is not proof the model ran; one sample forward is not full-cohort completion; inference is not label-grounded evaluation; finalization is not integrity verification. The optional Member 2 evaluation needs a pre-existing frozen protocol tied to the exact validation-only manifest/checkpoint and threshold. Its report is written under `artifacts/member3/evaluations/<run>/<unique-id>/`, outside the finalized run bundle, and linked to the original prediction file only with a matching hash receipt.
+
+**Verification limit:** the frontend integration record reports 1,235 local passing tests, 22 skips, live browser checks and synthetic-fixture evaluator wiring. It does **not** establish a completed new licensed-checkpoint inference experiment through the redesigned UI. The original held-out results remain preserved historical research evidence.
