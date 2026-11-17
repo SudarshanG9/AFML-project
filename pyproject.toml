@@ -15,6 +15,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# One-command installation of the local DeepTrace Streamlit workbench.
+# Scientific backend requirements (including torch) are in [project].dependencies.
+workbench = [
+    "streamlit>=1.36",
+    "plotly>=5.22",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+]
 dev = ["pytest>=7", "ruff>=0.5"]
 # Optional: exact physical-core count and RAM in scripts/check_environment.py.
 # The checker works without it (documented fallbacks).
