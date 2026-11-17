@@ -9,7 +9,7 @@ import plotly.express as px
 import streamlit as st
 
 from .data_access import (
-    CONFIGS, documented_validation_table,
+    CONFIGS, documented_validation_table, documented_test_results, documented_benchmark_summary, dimodif_npz_inspection_path,
     human_bytes, load_json, load_jsonl, manifest_summary, parse_jsonl_text,
     prediction_summary, shortcut_audit_summary, feature_file_summary_bytes, documented_shortcut_table,
     validate_benchmarks, validate_manifest, validate_metrics_report, validate_predictions,
@@ -89,6 +89,25 @@ def parse_uploaded_jsonl_with_error(upload: Any, label: str) -> list[dict[str, A
         return []
 
 
+def choose_many_local_or_upload(root: Path, label: str, paths: list[Path], key: str,
+                                 file_types: list[str]) -> tuple[list[Path], list[Any] | None]:
+    """Select multiple local artifacts or upload multiple files for this session only."""
+    col1, col2 = st.columns([1.25, 1])
+    with col1:
+        options = [str(p.relative_to(root)) if p.is_relative_to(root) else str(p) for p in paths]
+        chosen = st.multiselect(f"Local {label}", options, key=f"{key}_local_many")
+    with col2:
+        uploaded = st.file_uploader(
+            f"Or import {label}", type=file_types, accept_multiple_files=True,
+            key=f"{key}_upload_many",
+        )
+    selected_paths = [
+        p for p in paths
+        if (str(p.relative_to(root)) if p.is_relative_to(root) else str(p)) in chosen
+    ]
+    return selected_paths, (uploaded or None)
+
+
 def choose_local_or_upload(root: Path, label: str, paths: list[Path], key: str,
                             file_types: list[str]) -> tuple[Path | None, Any | None]:
     col1, col2 = st.columns([1.25, 1])
@@ -120,18 +139,22 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
     prediction_count = len(files["predictions"])
     benchmark_count = len(files["benchmarks"])
     metrics_count = len(files["metrics"])
-    run_count = len(files["run_dirs"])
+    run_count = sum((path / "run_manifest.json").is_file() for path in files["run_dirs"])
     cols = st.columns(5)
     metrics = [
         ("Manifests", str(manifest_count), "local JSONL files"),
         ("Prediction files", str(prediction_count), "local JSONL files"),
         ("Benchmark files", str(benchmark_count), "local JSONL files"),
         ("Evaluation reports", str(metrics_count), "structured metrics.json"),
-        ("Run folders", str(run_count), "with run provenance"),
+        ("Finalized runs", str(run_count), "run_manifest.json found"),
     ]
     for col, (label, value, foot) in zip(cols, metrics):
         with col:
             card(label, value, foot)
+    st.caption(
+        f"Reproducibility inventory: {len(files.get('environment_reports', []))} environment report(s) · "
+        f"{len(files.get('stage_profiles', []))} stage profile(s). Run integrity is checked on the Runs & system page."
+    )
     st.write("")
     left, right = st.columns([1.15, 1])
     with left:
@@ -149,7 +172,9 @@ def render_overview(root: Path, files: dict[str, list[Path]]) -> None:
             st.write("")
     with right:
         panel_title("Repository snapshot")
-        st.markdown(f"<div class='avf-card'><div class='avf-card-label'>Repository</div><div class='avf-card-value' style='font-size:1.12rem'>AFML-project</div><div class='avf-card-foot'>SudarshanG9/AFML-project</div><hr><div class='avf-card-label'>Branch / commit</div><div style='color:#e2e8f0;font-weight:650;margin-top:5px'>{git.get('branch') or 'not available'} · {git.get('commit') or 'not available'}</div><div class='avf-card-foot'>Working tree dirty: {git.get('dirty') or 'unknown'}</div></div>", unsafe_allow_html=True)
+        dirty = git.get("dirty")
+        dirty_display = "yes" if dirty is True else ("no" if dirty is False else "unknown")
+        st.markdown(f"<div class='avf-card'><div class='avf-card-label'>Repository</div><div class='avf-card-value' style='font-size:1.12rem'>AFML-project</div><div class='avf-card-foot'>SudarshanG9/AFML-project</div><hr><div class='avf-card-label'>Branch / commit</div><div style='color:#e2e8f0;font-weight:650;margin-top:5px'>{git.get('branch') or 'not available'} · {git.get('commit') or 'not available'}</div><div class='avf-card-foot'>Working tree dirty: {dirty_display}</div></div>", unsafe_allow_html=True)
         st.write("")
         st.info("The application reads local files under data/ and artifacts/. It does not transmit dataset clips or experiment files to a server.")
     st.divider()
@@ -221,14 +246,47 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
         else:
             selected_row = {}
             st.warning("No usable clip_id values are available for feature inspection.")
-        feature_path = Path(str(selected_row.get("feature_path", "")))
-        if not feature_path.is_absolute():
-            feature_path = root / feature_path
-        try:
-            feature_path = feature_path.resolve()
-            feature_inside_repo = feature_path.is_relative_to(root.resolve())
-        except OSError:
-            feature_inside_repo = False
+        default_npz_root = "."
+        if path is not None and path.is_relative_to(root):
+            default_npz_root = str(path.parent.relative_to(root))
+        feature_layout = st.selectbox(
+            "Feature layout for inspection",
+            ["shared_pt", "dimodif_npz"],
+            format_func=lambda value: "Shared token cache (.pt)" if value == "shared_pt" else "DiMoDif NPZ (<split>/<clip_id>/features.npz)",
+            key="feature_inspection_layout",
+            help="Choose the same explicit format used by the Member 3 loader; the layout is never guessed from the filename.",
+        )
+        feature_path: Path | None = None
+        feature_path_error: str | None = None
+        if feature_layout == "dimodif_npz":
+            npz_feature_root = st.text_input(
+                "DiMoDif feature root", value=default_npz_root, key="npz_feature_inspection_root",
+                help="The loader looks under <root>/<split>/<clip_id>/features.npz. Use a path inside this repository for local inspection.",
+            )
+            try:
+                feature_path = dimodif_npz_inspection_path(
+                    root, npz_feature_root, selected_row.get("split"), selected_row.get("clip_id")
+                )
+            except (OSError, ValueError) as exc:
+                feature_path_error = str(exc)
+        else:
+            raw_feature_path = selected_row.get("feature_path")
+            if raw_feature_path:
+                feature_path = Path(str(raw_feature_path)).expanduser()
+                if not feature_path.is_absolute():
+                    feature_path = root / feature_path
+                try:
+                    feature_path = feature_path.resolve()
+                except OSError as exc:
+                    feature_path_error = str(exc)
+            else:
+                feature_path_error = "The selected manifest row does not provide a feature_path."
+        feature_inside_repo = False
+        if feature_path is not None:
+            try:
+                feature_inside_repo = feature_path.is_relative_to(root.resolve())
+            except OSError:
+                feature_path_error = "The feature path could not be resolved safely."
         uploaded_feature = st.file_uploader("Optionally import one feature cache for metadata inspection", type=["npz", "pt"], key="feature_metadata_upload")
         if uploaded_feature is not None:
             if st.button("Inspect uploaded feature metadata", key="inspect_uploaded_feature"):
@@ -237,7 +295,7 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
                     st.json(info)
                 except Exception as exc:
                     st.error(f"Feature inspection failed: {type(exc).__name__}: {exc}")
-        elif feature_inside_repo and feature_path.is_file():
+        elif feature_path is not None and feature_inside_repo and feature_path.is_file():
             st.caption(f"Feature path: {feature_path.relative_to(root.resolve())}")
             if st.button("Inspect cached feature shapes", key="inspect_feature"):
                 try:
@@ -246,12 +304,13 @@ def render_dataset(root: Path, files: dict[str, list[Path]]) -> None:
                     st.json(info)
                 except Exception as exc:
                     st.error(f"Feature inspection failed: {type(exc).__name__}: {exc}")
+        elif feature_path is not None and not feature_inside_repo:
+            st.warning("The feature path resolves outside the selected repository; the dashboard will not read paths outside the checkout.")
+        elif feature_path_error:
+            st.warning(feature_path_error)
         else:
-            if not feature_inside_repo:
-                st.warning("The manifest feature_path resolves outside the selected repository; the dashboard will not read paths outside the checkout.")
-            else:
-                st.warning(f"Feature file is not present at the manifest path: {feature_path}")
-        st.caption("The repo's DiMoDif handoff reports NPZ arrays named `audio_features` / `video_features`, while the shared cache contract and adapter expect `audio_tokens` / `video_tokens`. The dashboard flags this mismatch; it does not silently rename or convert feature tensors.")
+            st.warning(f"Feature file is not present at the selected layout path: {feature_path}")
+        st.caption("For dimodif_npz, the explicit loader reads audio_features and video_features and exposes them to the adapter as audio_tokens and video_tokens (FP32). The shared .pt format expects audio_tokens and video_tokens directly. The NPZ loader uses the selected feature root and does not use the manifest's planned .pt feature_path.")
         st.caption("Raw video/audio upload is intentionally not offered: no checked-in raw-media-to-prediction UI/API exists, and licensed media is meant to stay in the local Member 2 pipeline.")
 
     st.divider()
@@ -401,6 +460,7 @@ def render_diagnostics(root: Path, files: dict[str, list[Path]]) -> None:
                                "dtype": item.get("dtype")})
         if layer_rows:
             st.dataframe(pd.DataFrame(layer_rows), use_container_width=True, hide_index=True)
+            st.caption("Q, K and V shapes use [batch, heads, sequence length, head dimension]. For example, [1, 4, 1202, 16] means one sequence, four heads, 1,202 positions and 16 values per head.")
         mask = attention.get("attention_mask", {})
         st.write("**Attention mask inspection**")
         st.json(mask)
@@ -578,8 +638,9 @@ def render_demo(root: Path, files: dict[str, list[Path]]) -> None:
     st.write(f"**Adapter status:** {status['adapter_mode_status']}")
     st.write(f"**CLI status:** {status['cli_status']}")
     st.caption("The form above invokes the real cached-feature CLI on validation only. The test split remains governed by Member 2’s protocol/unseal/purpose checks and C9/C10 owner approvals. No raw AV clip upload is provided.")
-    with st.expander("Run synthetic infrastructure smoke test", expanded=False):
-        st.warning("This uses random synthetic tokens and a randomly initialized diagnostic head. Its scores are not deepfake predictions and must never enter evaluation reports.")
+    st.warning("Synthetic smoke is infrastructure-only: it uses random tokens and a randomly initialized diagnostic head. Its scores are not deepfake predictions, accuracy metrics or benchmark evidence.")
+    with st.expander("Run synthetic infrastructure smoke test — diagnostic only", expanded=False):
+        st.caption("This command checks software wiring only. Never copy its scores into prediction or evaluation artifacts.")
         if st.button("Run diagnostic smoke test", key="run_smoke"):
             with st.spinner("Running the backend's --smoke diagnostic..."):
                 code, output = run_diagnostic_smoke(root)
@@ -619,6 +680,49 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
             source = str(path)
         except Exception as exc:
             st.error(f"Could not read metrics report: {type(exc).__name__}: {exc}")
+    # A committed held-out summary is documentation, not a freshly loaded metrics.json artifact.
+    test_doc = root / "docs/member2/results/TEST_RESULTS.md"
+    if test_doc.is_file():
+        text = test_doc.read_text(encoding="utf-8", errors="replace")
+        documented = documented_test_results(text)
+        if documented["rows"]:
+            meta = documented["metadata"]
+            st.info("Showing Member 2's committed held-out test summary. These are documented results, not a newly computed evaluation or a verified live prediction import.")
+            st.caption(f"Documentation source: {test_doc.relative_to(root)} · Reported prediction run: {meta.get('run_id', 'not stated')}")
+            if meta.get("total_test_videos"):
+                st.write(f"**Reported test cohort:** {meta['total_test_videos']:,} videos · **Source groups:** {meta.get('source_groups', 'not stated'):,}")
+            if meta.get("threshold") is not None:
+                st.write(f"**Validation-frozen threshold:** {meta['threshold']:.6f} · **Bootstrap:** {meta.get('bootstrap_resamples', 'not stated')} resamples, seed {meta.get('bootstrap_seed', 'not stated')}")
+            table = []
+            for row in documented["rows"]:
+                table.append({
+                    "Configuration": CFG_LABELS.get(row["config"], row["config"]),
+                    "AUROC": f"{row['auroc']:.4f} [{row['auroc_ci_low']:.4f}, {row['auroc_ci_high']:.4f}]",
+                    "AUPRC": f"{row['auprc']:.4f}", "BCE": f"{row['bce']:.4f}",
+                    "Recall": f"{row['recall']:.3f}", "Real FPR": f"{row['real_fpr']:.3f}",
+                })
+            panel_title("Published held-out results", "Transcribed from Member 2's checked-in report; AUROC confidence intervals are shown as published.")
+            st.dataframe(pd.DataFrame(table), use_container_width=True, hide_index=True)
+            per_type = documented.get("per_type", [])
+            if per_type:
+                with st.expander("Reference performance by manipulation type"):
+                    st.dataframe(pd.DataFrame([{
+                        "Manipulation": row["manipulation_type"].replace("_", " "),
+                        "AUROC": row["auroc"], "Recall": row["recall"],
+                    } for row in per_type]), use_container_width=True, hide_index=True)
+            paired = documented.get("paired_bce", [])
+            if paired:
+                with st.expander("Paired BCE contrasts — supporting analysis"):
+                    st.caption("Intervals crossing zero are inconclusive; they do not establish equivalence.")
+                    st.dataframe(pd.DataFrame([{
+                        "Contrast": row["contrast"], "Delta BCE": row["delta_bce"],
+                        "95% CI": f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}]",
+                        "CI excludes zero": row["ci_low"] > 0 or row["ci_high"] < 0,
+                    } for row in paired]), use_container_width=True, hide_index=True)
+            st.warning("Report limitations: simulated INT8 uses floating-point arithmetic; no hardware speedup is established. Source groups do not prove speaker independence, duration was not controlled, and test-label-derived summaries were inspected before freeze. The report records three inference attempts, including a failed pre-scoring attempt and a stopped attempt.")
+            with st.expander("Read the complete Member 2 test report"):
+                st.markdown(text)
+            st.caption("For machine-readable paired metrics, import the corresponding structured metrics JSON when available. This documentation view does not synthesize missing confidence intervals or prediction files.")
     if report:
         errors = validate_metrics_report(report)
         split = report.get("split")
@@ -689,18 +793,20 @@ def render_evaluation(root: Path, files: dict[str, list[Path]]) -> None:
                     row[m.upper()] = f"{v:.4f}{ci}" if v is not None else "—"
                 strata.append(row)
         if strata:
-            st.dataframe(pd.DataFrame(strata), use_container_width=True, hide_index=True)
+            with st.expander("Manipulation-stratified metrics"):
+                st.dataframe(pd.DataFrame(strata), use_container_width=True, hide_index=True)
         paired = report.get("paired", [])
         if isinstance(paired, list) and paired:
-            panel_title("Paired configuration comparisons", "`delta` is b − a; a result is marked statistically distinguishable only if the paired 95% CI excludes zero.")
-            p_rows = []
-            for comparison in paired:
-                for metric, block in comparison.get("metrics", {}).items():
-                    lo, hi = block.get("ci_low"), block.get("ci_high")
-                    p_rows.append({"Comparison": f"{comparison.get('b')} − {comparison.get('a')}", "Metric": metric,
-                                   "Delta": block.get("delta"), "95% CI": f"[{lo:.4f}, {hi:.4f}]" if isinstance(lo,(int,float)) and isinstance(hi,(int,float)) else "—",
-                                   "CI excludes 0": bool(block.get("excludes_zero"))})
-            st.dataframe(pd.DataFrame(p_rows), use_container_width=True, hide_index=True)
+            with st.expander("Paired configuration comparisons — supporting analysis"):
+                st.caption("`delta` is b − a; a result is marked statistically distinguishable only if the paired 95% CI excludes zero.")
+                p_rows = []
+                for comparison in paired:
+                    for metric, block in comparison.get("metrics", {}).items():
+                        lo, hi = block.get("ci_low"), block.get("ci_high")
+                        p_rows.append({"Comparison": f"{comparison.get('b')} − {comparison.get('a')}", "Metric": metric,
+                                       "Delta": block.get("delta"), "95% CI": f"[{lo:.4f}, {hi:.4f}]" if isinstance(lo,(int,float)) and isinstance(hi,(int,float)) else "—",
+                                       "CI excludes 0": bool(block.get("excludes_zero"))})
+                st.dataframe(pd.DataFrame(p_rows), use_container_width=True, hide_index=True)
         st.caption(f"Bootstrap resamples: {report.get('n_boot', 'not recorded')} · seed: {report.get('seed', 'not recorded')} · manifest SHA-256: {report.get('manifest_sha256', 'not recorded')}")
         return
     # Structured metrics may not have been committed. Show the repo's documented validation snapshot as documentation, not as a fresh artifact.
@@ -724,6 +830,30 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
     page_header("RUNTIME / MEMBER 3", "Benchmark explorer",
                 "Read the Member 3 benchmark records without conflating operator, cached-feature model, or preprocessing costs.")
     st.markdown("<div class='avf-warn'><b>Precision disclosure:</b> all non-reference configurations are simulated fake quantization in floating-point arithmetic. The runtime records do not measure a real INT8 kernel or prove INT8 hardware speedup.</div>", unsafe_allow_html=True)
+
+    with st.expander("Documented benchmark snapshot (optional report upload)"):
+        report = st.file_uploader(
+            "Upload a Markdown benchmark report",
+            type=["md", "markdown", "txt"],
+            key="documented_benchmark_report",
+        )
+        if report is not None:
+            try:
+                snapshot = documented_benchmark_summary(report.getvalue().decode("utf-8"))
+            except UnicodeDecodeError:
+                snapshot = None
+                st.error("The report must be UTF-8 text.")
+            if snapshot is None:
+                st.info("No recognized typical-workload p50 summary was found. Upload the report containing the 'Verified typical p50 ms' summary.")
+            else:
+                st.caption("Documented snapshot only · not a live benchmark run or a validated benchmark-record artifact.")
+                snapshot_df = pd.DataFrame(
+                    [{"Configuration": config, "p50 (ms)": latency}
+                     for config, latency in snapshot["p50_ms"].items()]
+                )
+                st.dataframe(snapshot_df, use_container_width=True, hide_index=True)
+                st.json({"scope": snapshot["scope"], "device": snapshot["device"],
+                         "backend": snapshot["backend"], "extra_cost_ms": snapshot["extra_cost_ms"]})
     selected_paths, uploads = choose_many_local_or_upload(root, "benchmark JSONL files", files["benchmarks"], "benchmarks", ["jsonl", "txt"])
     rows: list[dict[str, Any]] = []
     source = None
@@ -778,6 +908,16 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
     c[0].metric("Series", f"{len(view):,}")
     c[1].metric("Median p50", f"{p50_values.median():.3f} ms" if len(p50_values) else "Not available")
     c[2].metric("Peak memory", human_bytes(mem_values.max()) if len(mem_values) else "Not measured")
+    group_columns = [column for column in ("scope", "device", "config") if column in view.columns]
+    if group_columns:
+        grouped = view.groupby(group_columns, dropna=False)
+        comparison = grouped.size().rename("Records").to_frame()
+        for latency_name in ("p50_ms", "p95_ms"):
+            if latency_name in view.columns:
+                comparison[f"Median recorded {latency_name}"] = grouped[latency_name].median()
+        with st.expander("Grouped benchmark comparison", expanded=True):
+            st.dataframe(comparison.reset_index(), use_container_width=True, hide_index=True)
+            st.caption("Group values are medians of the per-record p50/p95 measurements shown in the JSONL. They are not pooled per-call percentiles; compare only records with matching scope, device and workload.")
     if len(view) and {"config", "p50_ms", "p95_ms"}.issubset(view.columns):
         chart_df = view.melt(id_vars=[c for c in ("config","scope","device") if c in view], value_vars=[c for c in ("p50_ms","p95_ms") if c in view], var_name="Latency statistic", value_name="Latency (ms)")
         fig = px.bar(chart_df, x="config", y="Latency (ms)", color="Latency statistic", barmode="group", facet_col="scope" if "scope" in view and view["scope"].nunique()>1 else None, template="plotly_dark")
@@ -796,6 +936,19 @@ def render_benchmarks(root: Path, files: dict[str, list[Path]]) -> None:
 def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
     page_header("REPRODUCIBILITY / MEMBER 3", "Runs & system",
                 "Inspect environment diagnostics, saved configuration snapshots, hashes and artifact-integrity checks.")
+    run_dirs = files.get("run_dirs", [])
+    finalized_runs = [path for path in run_dirs if (path / "run_manifest.json").is_file()]
+    provenance_count = sum((path / "provenance.json").is_file() for path in finalized_runs)
+    hash_manifest_count = sum((path / "integrity" / "artifact_hashes.json").is_file() for path in finalized_runs)
+    status_cols = st.columns(5)
+    for col, label, value in zip(
+        status_cols,
+        ("Environment reports", "Finalized run bundles", "Provenance files", "Artifact hash manifests", "Stage profiles"),
+        (len(files.get("environment_reports", [])), len(finalized_runs), provenance_count,
+         hash_manifest_count, len(files.get("stage_profiles", []))),
+    ):
+        col.metric(label, value)
+    st.caption("These counts show artifact availability only. Integrity is actually checked when a run is selected below; a present hash manifest is not itself a passing verification.")
     col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("Environment diagnostics")
@@ -822,9 +975,8 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
                     st.code(output)
     with col2:
         st.subheader("Run integrity")
-        run_dirs = files["run_dirs"]
-        chosen = st.selectbox("Run folder", ["— none —", *[str(p.relative_to(root)) for p in run_dirs]], key="run_select")
-        run_dir = next((p for p in run_dirs if str(p.relative_to(root)) == chosen), None)
+        chosen = st.selectbox("Run folder", ["— none —", *[str(p.relative_to(root)) for p in finalized_runs]], key="run_select")
+        run_dir = next((p for p in finalized_runs if str(p.relative_to(root)) == chosen), None)
         if run_dir:
             manifest_path = run_dir / "run_manifest.json"
             if manifest_path.is_file():
@@ -905,9 +1057,9 @@ def render_runs(root: Path, files: dict[str, list[Path]]) -> None:
 def render_import_help(root: Path) -> None:
     page_header("LOCAL FILE WORKFLOW", "Artifact import & file handling",
                 "The dashboard reads research artifacts from the local repository or from files you explicitly import into the browser session.")
-    st.markdown("<div class='avf-note'><b>Privacy by design:</b> imported JSON/JSONL files are parsed in the current Streamlit session. The dashboard does not upload them to a remote service or copy them into Git. Move the canonical files into the repository's documented data/ or artifacts/ folders if you want automatic discovery on the next launch.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='avf-note'><b>Local file handling:</b> imported JSON/JSONL files are parsed by the Streamlit process for the current session and are not copied into Git or persisted by this dashboard. Run Streamlit locally or use only a trusted host: if this app is served remotely, the selected files are received by that host. Move canonical files into the repository's documented data/ or artifacts/ folders for automatic discovery on the next launch.</div>", unsafe_allow_html=True)
     st.subheader("Supported file types")
-    st.dataframe(pd.DataFrame([
+    st.table(pd.DataFrame([
         {"File": "manifest*.jsonl", "Purpose": "Clip IDs, dataset, source/identity groups, split, label, manipulation type and local feature path"},
         {"File": "predictions*.jsonl", "Purpose": "One score_fake row per clip × precision configuration; labels remain outside this file"},
         {"File": "metrics.json", "Purpose": "Member 2 overall/per-type metrics, cluster-bootstrap CIs and paired comparisons"},
